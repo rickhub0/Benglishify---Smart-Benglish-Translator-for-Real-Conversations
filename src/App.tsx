@@ -69,15 +69,58 @@ export default function App() {
       return;
     }
 
-    // Prevent overlapping requests
-    if (isLoading) return;
-
+    // Faster debounce for "live" feel
     const timer = setTimeout(() => {
       handleTranslate();
-    }, 1500); // Increased to 1500ms debounce to reduce API pressure
+    }, 500); 
 
     return () => clearTimeout(timer);
   }, [inputText, direction, isVoiceMode]);
+
+  // Live translation for immediate feedback
+  const handleLiveTranslate = (text: string) => {
+    if (!text.trim() || isVoiceMode) return;
+    
+    // 1. Check Offline Cache/Dictionary first for immediate result
+    const cached = offlineService.getFromCache(text, direction);
+    if (cached) {
+      setResult({
+        ...cached,
+        source: 'offline-cache'
+      });
+      return;
+    }
+
+    const dictMatch = offlineService.lookupInDictionary(text, direction);
+    if (dictMatch) {
+      setResult({
+        translatedText: dictMatch,
+        confidence: 0.95,
+        source: 'offline-dictionary'
+      });
+      return;
+    }
+
+    // 2. If no full match, try word-by-word for very fast feedback (only for Benglish to English)
+    if (direction === 'benglish-to-english') {
+      const words = text.toLowerCase().trim().split(/\s+/);
+      if (words.length > 1) {
+        const translatedWords = words.map(word => {
+          const match = offlineService.lookupInDictionary(word, direction);
+          return match || word;
+        });
+        
+        // Only show if at least one word was translated
+        if (translatedWords.some((w, i) => w !== words[i])) {
+          setResult({
+            translatedText: translatedWords.join(' '),
+            confidence: 0.5,
+            source: 'offline-dictionary'
+          });
+        }
+      }
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -697,7 +740,11 @@ export default function App() {
               )}
               <textarea
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+                onChange={(e) => {
+                  const text = e.target.value;
+                  setInputText(text);
+                  handleLiveTranslate(text);
+                }}
                 placeholder={isListening ? "Speak now..." : `Enter ${getSourceLang()}...`}
                 className={cn(
                   "w-full h-full min-h-[150px] md:min-h-[200px] resize-none border-none focus:ring-0 text-lg md:text-xl placeholder:text-gray-300 bg-transparent transition-all",

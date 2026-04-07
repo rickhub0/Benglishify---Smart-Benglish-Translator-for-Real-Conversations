@@ -1,4 +1,4 @@
-const API_URL = 'https://ais-dev-zdmhcgdj26bigk6cp7exw2-477798320912.europe-west2.run.app/api/translate';
+const API_URL = 'https://ais-dev-tnccjdrj3s2vquwn4fxgph-477798320912.europe-west2.run.app/api/translate';
 
 let translationTimeout;
 let currentDirection = 'benglish-to-english';
