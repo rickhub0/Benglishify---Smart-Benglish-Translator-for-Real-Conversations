@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: translations
+    // Document ID: auto-generated
+    // Fields:
+    //   - benglish: string (required, 1-1000 chars)
+    //   - bengali: string (optional, 1-1000 chars)
+    //   - english: string (required, 1-1000 chars)
+    //   - type: string (optional, enum: ['word', 'phrase', 'sentence'])
+    //   - tense: string (optional, 1-100 chars)
+    //   - synonyms: list (optional, max 20 items, each string 1-100 chars)
+    //   - example: string (optional, 1-2000 chars)
+    //   - notes: string (optional, 1-2000 chars)
+    //   - confidence: number (optional, 0-1)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: unknown_inputs
+    // Document ID: auto-generated
+    // Fields:
+    //   - input: string (required, 1-500 chars)
+    //   - direction: string (required, enum)
+    //   - timestamp: timestamp (required)
+    //   - count: number (required, positive)
+    //
+    // Collection: corrections
+    // Document ID: auto-generated
+    // Fields:
+    //   - originalInput: string (required, 1-1000 chars)
+    //   - suggestedOutput: string (required, 1-1000 chars)
+    //   - aiOutput: string (optional, 1-1000 chars)
+    //   - direction: string (required, 1-100 chars)
+    //   - timestamp: timestamp (required)
+    //   - userEmail: string (optional, valid email)
+    //   - status: string (required, enum: ['pending', 'reviewed', 'integrated'])
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - email: string (required)
+    //   - role: string (required, enum: ['admin', 'user'])
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "royrk3369@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isRecent(ts) {
+      return ts is timestamp && ts > request.time - duration.value(5, 'm') && ts <= request.time;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidTranslation(data) {
+      return data.keys().hasAll(['benglish', 'english', 'createdAt', 'updatedAt']) &&
+             data.benglish is string && data.benglish.size() >= 1 && data.benglish.size() <= 1000 &&
+             data.english is string && data.english.size() >= 1 && data.english.size() <= 1000 &&
+             (!('bengali' in data) || (data.bengali is string && data.bengali.size() <= 1000)) &&
+             (!('type' in data) || data.type in ['word', 'phrase', 'sentence']) &&
+             (!('synonyms' in data) || (data.synonyms is list && data.synonyms.size() <= 20)) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidUnknownInput(data) {
+      return data.keys().hasAll(['input', 'direction', 'timestamp', 'count']) &&
+             data.input is string && data.input.size() >= 1 && data.input.size() <= 500 &&
+             data.direction in ['benglish-to-english', 'english-to-benglish', 'bengali-to-english', 'english-to-bengali', 'voice-input'] &&
+             data.timestamp is timestamp &&
+             data.count is number && data.count >= 1;
+    }
+
+    function isValidCorrection(data) {
+      return data.keys().hasAll(['originalInput', 'suggestedOutput', 'direction', 'timestamp', 'status']) &&
+             data.originalInput is string && data.originalInput.size() >= 1 && data.originalInput.size() <= 1000 &&
+             data.suggestedOutput is string && data.suggestedOutput.size() >= 1 && data.suggestedOutput.size() <= 1000 &&
+             data.direction is string && data.direction.size() <= 100 &&
+             (!('userEmail' in data) || (data.userEmail == 'anonymous' || isValidEmail(data.userEmail))) &&
+             data.timestamp is timestamp &&
+             data.status in ['pending', 'reviewed', 'integrated'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && 
+                      request.resource.data.keys().hasAll(['email', 'role']) &&
+                      request.resource.data.email == request.auth.token.email &&
+                      request.resource.data.role == 'user'; // Users can only create themselves as 'user'
+      allow update: if isAdmin() || 
+                       (isOwner(userId) && 
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email']) &&
+                        request.resource.data.email == request.auth.token.email);
+    }
+
+    match /translations/{translationId} {
+      allow read: if true; // Publicly readable dictionary
+      allow write: if isAdmin();
+    }
+
+    match /unknown_inputs/{inputId} {
+      allow read: if isAdmin(); // Only admins should see what's failing
+      allow create: if isValidUnknownInput(request.resource.data) && isRecent(request.resource.data.timestamp);
+      allow update: if isAdmin() || 
+                       (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count', 'timestamp']) &&
+                        request.resource.data.count == resource.data.count + 1 &&
+                        isRecent(request.resource.data.timestamp));
+    }
+
+    match /corrections/{correctionId} {
+      allow read: if isAdmin();
+      allow create: if isValidCorrection(request.resource.data) && 
+                    request.resource.data.status == 'pending' &&
+                    isRecent(request.resource.data.timestamp);
+      allow update, delete: if isAdmin();
+    }
+
+    match /test/{docId} {
+      allow read: if true;
+    }
+  }
+}

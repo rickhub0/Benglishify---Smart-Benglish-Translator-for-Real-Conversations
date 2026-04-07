@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Translation": {
+      "title": "Translation",
+      "description": "A mapping between Benglish, Bengali, and English words or phrases.",
+      "type": "object",
+      "properties": {
+        "benglish": { "type": "string", "description": "The Benglish representation." },
+        "bengali": { "type": "string", "description": "The Bengali script representation." },
+        "english": { "type": "string", "description": "The English translation." },
+        "type": { "type": "string", "enum": ["word", "phrase", "sentence"] },
+        "tense": { "type": "string", "description": "Grammatical tense if applicable." },
+        "synonyms": { "type": "array", "items": { "type": "string" } },
+        "example": { "type": "string" },
+        "notes": { "type": "string" },
+        "confidence": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["benglish", "english"]
+    },
+    "UnknownInput": {
+      "title": "Unknown Input",
+      "description": "Logged inputs that the system couldn't translate confidently.",
+      "type": "object",
+      "properties": {
+        "input": { "type": "string" },
+        "direction": { "type": "string", "enum": ["benglish-to-english", "english-to-benglish", "bengali-to-english", "english-to-bengali"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "count": { "type": "number" }
+      },
+      "required": ["input", "direction", "timestamp"]
+    },
+    "Correction": {
+      "title": "Correction",
+      "description": "User-suggested corrections for translations.",
+      "type": "object",
+      "properties": {
+        "originalInput": { "type": "string" },
+        "suggestedOutput": { "type": "string" },
+        "aiOutput": { "type": "string" },
+        "direction": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "integrated"] }
+      },
+      "required": ["originalInput", "suggestedOutput", "direction", "timestamp"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and permissions.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/translations/{translationId}": {
+      "schema": "Translation",
+      "description": "The main translation dictionary."
+    },
+    "/unknown_inputs/{inputId}": {
+      "schema": "UnknownInput",
+      "description": "Store for auto-learning and mapping unknown phrases."
+    },
+    "/corrections/{correctionId}": {
+      "schema": "Correction",
+      "description": "User-suggested corrections for review."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User roles and metadata."
+    }
+  }
+}

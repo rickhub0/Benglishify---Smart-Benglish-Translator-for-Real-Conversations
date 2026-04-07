@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benglishify Popup</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <span class="sparkle">✨</span>
+        <h1>Benglishify</h1>
+      </div>
+      <button id="settings-btn" title="Settings">⚙️</button>
+    </header>
+
+    <main>
+      <div class="direction-toggle">
+        <span id="from-lang">Benglish</span>
+        <button id="swap-btn" title="Swap Languages">⇄</button>
+        <span id="to-lang">English</span>
+      </div>
+
+      <div class="input-area">
+        <textarea id="input-text" placeholder="Type Benglish here..."></textarea>
+      </div>
+
+      <div class="output-area">
+        <div id="loading" class="hidden">
+          <div class="spinner"></div>
+          <span>Translating...</span>
+        </div>
+        <div id="result-container" class="hidden">
+          <p id="result-text"></p>
+          <button id="copy-btn" title="Copy to Clipboard">📋</button>
+        </div>
+        <div id="placeholder-text">Translation will appear here...</div>
+      </div>
+    </main>
+
+    <footer>
+      <div class="status">
+        <span id="online-dot" class="dot online"></span>
+        <span id="status-text">Connected</span>
+      </div>
+      <div class="actions">
+        <button id="mic-btn" title="Voice Input">🎤</button>
+      </div>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
