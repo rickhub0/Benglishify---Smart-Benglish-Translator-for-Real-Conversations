@@ -73,9 +73,9 @@ service cloud.firestore {
 
     function isValidTranslation(data) {
       return data.keys().hasAll(['benglish', 'english', 'createdAt', 'updatedAt']) &&
-             data.benglish is string && data.benglish.size() >= 1 && data.benglish.size() <= 1000 &&
-             data.english is string && data.english.size() >= 1 && data.english.size() <= 1000 &&
-             (!('bengali' in data) || (data.bengali is string && data.bengali.size() <= 1000)) &&
+             data.benglish is string && data.benglish.size() >= 1 && data.benglish.size() <= 5000 &&
+             data.english is string && data.english.size() >= 1 && data.english.size() <= 5000 &&
+             (!('bengali' in data) || (data.bengali is string && data.bengali.size() <= 5000)) &&
              (!('type' in data) || data.type in ['word', 'phrase', 'sentence']) &&
              (!('synonyms' in data) || (data.synonyms is list && data.synonyms.size() <= 20)) &&
              data.createdAt is timestamp &&
@@ -84,7 +84,7 @@ service cloud.firestore {
 
     function isValidUnknownInput(data) {
       return data.keys().hasAll(['input', 'direction', 'timestamp', 'count']) &&
-             data.input is string && data.input.size() >= 1 && data.input.size() <= 500 &&
+             data.input is string && data.input.size() >= 1 && data.input.size() <= 5000 &&
              data.direction in ['benglish-to-english', 'english-to-benglish', 'bengali-to-english', 'english-to-bengali', 'voice-input'] &&
              data.timestamp is timestamp &&
              data.count is number && data.count >= 1;
@@ -92,8 +92,8 @@ service cloud.firestore {
 
     function isValidCorrection(data) {
       return data.keys().hasAll(['originalInput', 'suggestedOutput', 'direction', 'timestamp', 'status']) &&
-             data.originalInput is string && data.originalInput.size() >= 1 && data.originalInput.size() <= 1000 &&
-             data.suggestedOutput is string && data.suggestedOutput.size() >= 1 && data.suggestedOutput.size() <= 1000 &&
+             data.originalInput is string && data.originalInput.size() >= 1 && data.originalInput.size() <= 5000 &&
+             data.suggestedOutput is string && data.suggestedOutput.size() >= 1 && data.suggestedOutput.size() <= 5000 &&
              data.direction is string && data.direction.size() <= 100 &&
              (!('userEmail' in data) || (data.userEmail == 'anonymous' || isValidEmail(data.userEmail))) &&
              data.timestamp is timestamp &&
@@ -122,7 +122,7 @@ service cloud.firestore {
     }
 
     match /unknown_inputs/{inputId} {
-      allow read: if isAdmin(); // Only admins should see what's failing
+      allow read: if true; // Allow checking for existing entries
       allow create: if isValidUnknownInput(request.resource.data) && isRecent(request.resource.data.timestamp);
       allow update: if isAdmin() || 
                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count', 'timestamp']) &&

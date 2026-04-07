@@ -18,10 +18,20 @@ export interface ConversationContext {
   output: string;
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const getApiKey = () => {
+  const key = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
+  return key;
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 const modelName = "gemini-3-flash-preview";
 
 export async function translateWithAI(text: string, direction: TranslationDirection, history: ConversationContext[] = []): Promise<string | TranslationResult> {
+  const apiKey = getApiKey();
+  if (!apiKey || apiKey === "AI Studio Free Tier") {
+    throw new Error("Gemini API key is missing or invalid. Please ensure GEMINI_API_KEY is correctly set in your environment variables.");
+  }
+
   try {
     let systemInstruction = "";
     const contextPrompt = history.length > 0 
