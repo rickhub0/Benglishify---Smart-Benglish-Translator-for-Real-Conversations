@@ -2,7 +2,6 @@
   "version": 2,
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.ts" },
-    { "handle": "filesystem" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "cleanUrls": true,
