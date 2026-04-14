@@ -6,7 +6,7 @@ import { offlineService } from "./offlineService";
 export interface TranslationResult {
   translatedText: string;
   confidence: number;
-  source: 'rule-based' | 'ai' | 'offline-cache' | 'offline-dictionary';
+  source: 'rule-based' | 'ai' | 'offline-cache' | 'offline-dictionary' | 'community-driven';
   fullResult?: {
     benglish: string;
     english: string;
@@ -107,49 +107,52 @@ export async function translate(text: string, direction: TranslationDirection, h
     throw new Error("You are currently offline. This translation is not available in your local cache.");
   }
 
-  // 2. Rule-based lookup (Online)
-  const path = "translations";
-  try {
-    const translationsRef = collection(db, path);
-    let q;
+    // 2. Rule-based lookup (Online)
+    const collections = ["translations", "community_translations"];
     
-    if (direction === 'benglish-to-english') {
-      q = query(translationsRef, where("benglish", "==", text.toLowerCase()));
-    } else if (direction === 'bengali-to-english') {
-      q = query(translationsRef, where("bengali", "==", text));
-    } else if (direction === 'english-to-bengali') {
-      q = query(translationsRef, where("english", "==", text));
-    } else if (direction === 'english-to-benglish') {
-      q = query(translationsRef, where("english", "==", text));
-    }
-
-    if (q) {
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-        const docData = querySnapshot.docs[0].data() as DocumentData;
-        let translatedText = "";
-        if (direction === 'benglish-to-english' || direction === 'bengali-to-english') {
-          translatedText = docData.english;
+    for (const path of collections) {
+      try {
+        const translationsRef = collection(db, path);
+        let q;
+        
+        if (direction === 'benglish-to-english') {
+          q = query(translationsRef, where("benglish", "==", text.toLowerCase()));
+        } else if (direction === 'bengali-to-english') {
+          q = query(translationsRef, where("bengali", "==", text));
         } else if (direction === 'english-to-bengali') {
-          translatedText = docData.bengali;
+          q = query(translationsRef, where("english", "==", text));
         } else if (direction === 'english-to-benglish') {
-          translatedText = docData.benglish;
+          q = query(translationsRef, where("english", "==", text));
         }
 
-        if (translatedText) {
-          const result: TranslationResult = {
-            translatedText,
-            confidence: docData.confidence || 1.0,
-            source: 'rule-based'
-          };
-          offlineService.saveToCache(text, direction, result);
-          return result;
+        if (q) {
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const docData = querySnapshot.docs[0].data() as DocumentData;
+            let translatedText = "";
+            if (direction === 'benglish-to-english' || direction === 'bengali-to-english') {
+              translatedText = docData.english;
+            } else if (direction === 'english-to-bengali') {
+              translatedText = docData.bengali;
+            } else if (direction === 'english-to-benglish') {
+              translatedText = docData.benglish;
+            }
+
+            if (translatedText) {
+              const result: TranslationResult = {
+                translatedText,
+                confidence: docData.confidence || 1.0,
+                source: path === 'translations' ? 'rule-based' : 'community-driven'
+              };
+              offlineService.saveToCache(text, direction, result);
+              return result;
+            }
+          }
         }
+      } catch (error) {
+        console.warn(`${path} lookup failed:`, error);
       }
     }
-  } catch (error) {
-    console.warn("Rule-based lookup failed, falling back to AI:", error);
-  }
 
   // 3. AI Translation (Online)
   try {
@@ -171,9 +174,10 @@ export async function translate(text: string, direction: TranslationDirection, h
       };
     }
 
-    // Cache successful AI translations too
+    // Cache successful AI translations and save to Community Dictionary
     if (result.translatedText && result.translatedText !== "Error in translation.") {
       offlineService.saveToCache(text, direction, result);
+      saveToCommunityDictionary(text, direction, result);
       logUnknownInput(text, direction);
     }
 
@@ -181,6 +185,30 @@ export async function translate(text: string, direction: TranslationDirection, h
   } catch (error) {
     console.error("AI Translation failed:", error);
     throw error;
+  }
+}
+
+async function saveToCommunityDictionary(input: string, direction: TranslationDirection, result: TranslationResult) {
+  if (!result.fullResult) return;
+  
+  const path = "community_translations";
+  try {
+    const communityRef = collection(db, path);
+    // Check if it already exists to avoid duplicates
+    const q = query(communityRef, where("english", "==", result.fullResult.english), limit(1));
+    const snap = await getDocs(q);
+    
+    if (snap.empty) {
+      await addDoc(communityRef, {
+        ...result.fullResult,
+        confidence: 0.85,
+        addedAt: serverTimestamp(),
+        verified: false,
+        usageCount: 1
+      });
+    }
+  } catch (error) {
+    console.warn("Failed to save to community dictionary:", error);
   }
 }
 

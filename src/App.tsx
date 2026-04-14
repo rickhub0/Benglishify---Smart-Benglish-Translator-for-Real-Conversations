@@ -35,6 +35,7 @@ export default function App() {
   const [csvInput, setCsvInput] = useState("");
   const [importFormat, setImportFormat] = useState<'benglish-first' | 'english-first'>('benglish-first');
   const [isImporting, setIsImporting] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [importStatus, setImportStatus] = useState<{ success?: boolean; message?: string } | null>(null);
 
   // Correction State
@@ -205,6 +206,21 @@ export default function App() {
       setImportStatus({ success: false, message });
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleBootstrap = async () => {
+    setIsBootstrapping(true);
+    setImportStatus(null);
+    try {
+      const { bootstrapCommunityDictionary } = await import("./services/importService");
+      const count = await bootstrapCommunityDictionary(30);
+      setImportStatus({ success: true, message: `AI successfully generated and saved ${count} realistic Benglish conversations to your community dictionary!` });
+    } catch (error: any) {
+      console.error("Bootstrap error:", error);
+      setImportStatus({ success: false, message: error.message || "AI training failed." });
+    } finally {
+      setIsBootstrapping(false);
     }
   };
 
@@ -622,7 +638,8 @@ export default function App() {
                           </div>
                           
                           <div className="flex items-center gap-3">
-                            <span className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-100">
+                            <span className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-100 flex items-center gap-1.5">
+                              {result.source === 'ai' && <Sparkles className="w-3 h-3" />}
                               {result.source.replace('-', ' ')}
                             </span>
                             <div className="flex gap-2">
@@ -815,11 +832,12 @@ export default function App() {
                     </p>
                     <div className="mt-3 md:mt-4 flex items-center gap-2">
                       <span className={cn(
-                        "text-[9px] md:text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded",
+                        "text-[9px] md:text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded flex items-center gap-1",
                         result.source === 'rule-based' ? "bg-green-100 text-green-700" : 
                         result.source.startsWith('offline') ? "bg-amber-100 text-amber-700" :
                         "bg-purple-100 text-purple-700"
                       )}>
+                        {result.source === 'ai' && <Sparkles className="w-2.5 h-2.5" />}
                         {result.source.replace('-', ' ')}
                       </span>
                       <span className="text-[10px] md:text-xs text-gray-400">
@@ -970,6 +988,31 @@ export default function App() {
               </div>
               
               <div className="p-6">
+                <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-bold text-blue-800 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      AI-Powered Training
+                    </h3>
+                  </div>
+                  <p className="text-xs text-blue-600 mb-4">
+                    Don't have a dataset? Use Gemini to generate realistic internet-style Benglish conversations and save them directly to your Community Dictionary.
+                  </p>
+                  <button
+                    onClick={handleBootstrap}
+                    disabled={isBootstrapping}
+                    className={cn(
+                      "w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2",
+                      isBootstrapping 
+                        ? "bg-blue-100 text-blue-400 cursor-not-allowed" 
+                        : "bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-95"
+                    )}
+                  >
+                    {isBootstrapping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    {isBootstrapping ? "AI is generating conversations..." : "Generate & Train with AI"}
+                  </button>
+                </div>
+
                 <div className="mb-3 md:mb-4">
                   <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1.5 md:mb-2">CSV Format</label>
                   <div className="flex gap-2 md:gap-4">
