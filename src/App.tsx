@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { Languages, ArrowRightLeft, Copy, Check, Sparkles, History, Info, Loader2, Settings, Upload, X, AlertCircle, LogIn, LogOut, User, ChevronDown, Mic, MicOff, Volume2, Wifi, WifiOff, CheckCircle, XCircle, Wand2 } from "lucide-react";
+import { Languages, ArrowRightLeft, Copy, Check, Sparkles, History, Info, Loader2, Settings, Upload, X, AlertCircle, LogIn, LogOut, User, ChevronDown, Mic, MicOff, Volume2, Wifi, WifiOff, CheckCircle, XCircle, Wand2, Github, Instagram } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { translate, TranslationResult, syncMasterDictionary } from "./services/translationService";
 import { importCSVData } from "./services/importService";
@@ -388,10 +388,11 @@ export default function App() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <div className="bg-blue-600 p-1.5 md:p-2 rounded-lg">
-            <Languages className="text-white w-5 h-5 md:w-6 md:h-6" />
-          </div>
-          <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-gray-800 truncate max-w-[120px] md:max-w-none">Benglishify</h1>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center">
+            <span className="text-gray-900">বেং</span>
+            <span className="text-[#C25400]">lish</span>
+            <span className="text-gray-900">ify</span>
+          </h1>
           {!isOnline && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100 text-[10px] md:text-xs font-bold uppercase tracking-wider animate-pulse">
               <WifiOff className="w-3 h-3 md:w-3.5 md:h-3.5" />
@@ -1126,8 +1127,34 @@ export default function App() {
       </AnimatePresence>
 
       {/* Footer */}
-      <footer className="mt-auto py-6 md:py-10 px-4 md:px-6 text-center text-gray-400 text-[10px] md:text-sm border-t border-gray-100 bg-white">
-        <p>© 2026 Benglishify. Built by @Clickors for the Bengali community..</p>
+      <footer className="mt-auto py-8 md:py-12 px-4 md:px-6 border-t border-gray-100 bg-white">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="text-center md:text-left">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Benglishify.pro</h2>
+            <p className="text-gray-400 text-xs md:text-sm">© 2026 Benglishify.pro. Built by @Clickors for the Bengali community.</p>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <a 
+              href="https://github.com/rickhub0" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <Github className="w-5 h-5" />
+              <span>GitHub</span>
+            </a>
+            <a 
+              href="https://www.instagram.com/clickors/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-pink-600 transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <Instagram className="w-5 h-5" />
+              <span>Instagram</span>
+            </a>
+          </div>
+        </div>
       </footer>
       {/* Grammarly Modal */}
       <AnimatePresence>
