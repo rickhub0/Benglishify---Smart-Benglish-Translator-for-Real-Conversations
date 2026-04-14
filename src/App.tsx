@@ -19,6 +19,7 @@ import { auth } from "./firebase";
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
 
 export default function App() {
+  console.log("Benglishify: App component rendering...");
   const [inputText, setInputText] = useState("");
   const [direction, setDirection] = useState<TranslationDirection>('benglish-to-english');
   const [result, setResult] = useState<TranslationResult | null>(null);
