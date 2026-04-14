@@ -19,7 +19,6 @@ import { auth } from "./firebase";
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
 
 export default function App() {
-  console.log("Benglishify: App component rendering...");
   const [inputText, setInputText] = useState("");
   const [direction, setDirection] = useState<TranslationDirection>('benglish-to-english');
   const [result, setResult] = useState<TranslationResult | null>(null);
@@ -36,7 +35,6 @@ export default function App() {
   const [csvInput, setCsvInput] = useState("");
   const [importFormat, setImportFormat] = useState<'benglish-first' | 'english-first'>('benglish-first');
   const [isImporting, setIsImporting] = useState(false);
-  const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [importStatus, setImportStatus] = useState<{ success?: boolean; message?: string } | null>(null);
 
   // Correction State
@@ -207,21 +205,6 @@ export default function App() {
       setImportStatus({ success: false, message });
     } finally {
       setIsImporting(false);
-    }
-  };
-
-  const handleBootstrap = async () => {
-    setIsBootstrapping(true);
-    setImportStatus(null);
-    try {
-      const { bootstrapCommunityDictionary } = await import("./services/importService");
-      const count = await bootstrapCommunityDictionary(30);
-      setImportStatus({ success: true, message: `AI successfully generated and saved ${count} realistic Benglish conversations to your community dictionary!` });
-    } catch (error: any) {
-      console.error("Bootstrap error:", error);
-      setImportStatus({ success: false, message: error.message || "AI training failed." });
-    } finally {
-      setIsBootstrapping(false);
     }
   };
 
@@ -989,31 +972,6 @@ export default function App() {
               </div>
               
               <div className="p-6">
-                <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-bold text-blue-800 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" />
-                      AI-Powered Training
-                    </h3>
-                  </div>
-                  <p className="text-xs text-blue-600 mb-4">
-                    Don't have a dataset? Use Gemini to generate realistic internet-style Benglish conversations and save them directly to your Community Dictionary.
-                  </p>
-                  <button
-                    onClick={handleBootstrap}
-                    disabled={isBootstrapping}
-                    className={cn(
-                      "w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2",
-                      isBootstrapping 
-                        ? "bg-blue-100 text-blue-400 cursor-not-allowed" 
-                        : "bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-95"
-                    )}
-                  >
-                    {isBootstrapping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                    {isBootstrapping ? "AI is generating conversations..." : "Generate & Train with AI"}
-                  </button>
-                </div>
-
                 <div className="mb-3 md:mb-4">
                   <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1.5 md:mb-2">CSV Format</label>
                   <div className="flex gap-2 md:gap-4">

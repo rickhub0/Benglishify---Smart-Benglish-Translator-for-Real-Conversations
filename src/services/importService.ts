@@ -14,34 +14,6 @@ export interface RawTranslation {
   confidence?: number;
 }
 
-import { generateSyntheticBenglishData } from "./geminiService";
-
-export async function bootstrapCommunityDictionary(count: number = 20) {
-  try {
-    const data = await generateSyntheticBenglishData(count);
-    const batch = writeBatch(db);
-    const path = "community_translations";
-    
-    data.forEach(item => {
-      const docRef = doc(collection(db, path));
-      batch.set(docRef, {
-        ...item,
-        confidence: 0.9,
-        addedAt: serverTimestamp(),
-        verified: true,
-        usageCount: 1,
-        source: 'ai-bootstrap'
-      });
-    });
-
-    await batch.commit();
-    return data.length;
-  } catch (error) {
-    console.error("Bootstrap failed:", error);
-    throw error;
-  }
-}
-
 export async function importCSVData(csvText: string, format: 'benglish-first' | 'english-first') {
   const lines = csvText.split('\n').filter(line => line.trim() !== '');
   // Skip header if it exists

@@ -3,10 +3,6 @@ import { getAuth } from 'firebase/auth';
 import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-if (!firebaseConfig || !firebaseConfig.projectId) {
-  throw new Error("Firebase configuration is missing or invalid. Please check firebase-applet-config.json.");
-}
-
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore with long polling to bypass WebSocket restrictions

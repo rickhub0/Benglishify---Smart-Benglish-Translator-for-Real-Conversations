@@ -71,15 +71,10 @@ export class SpeechService {
   private isListening: boolean = false;
 
   constructor() {
-    try {
-      if (SpeechRecognition) {
-        this.recognition = new SpeechRecognition();
-        this.recognition.continuous = false;
-        this.recognition.interimResults = true;
-      }
-    } catch (e) {
-      console.error("Failed to initialize SpeechRecognition:", e);
-      this.recognition = null;
+    if (SpeechRecognition) {
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = false;
+      this.recognition.interimResults = true;
     }
   }
 
