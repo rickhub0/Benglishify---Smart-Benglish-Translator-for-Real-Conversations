@@ -622,8 +622,7 @@ export default function App() {
                           </div>
                           
                           <div className="flex items-center gap-3">
-                            <span className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-100 flex items-center gap-1.5">
-                              {result.source === 'ai' && <Sparkles className="w-3 h-3" />}
+                            <span className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-100">
                               {result.source.replace('-', ' ')}
                             </span>
                             <div className="flex gap-2">
@@ -816,12 +815,11 @@ export default function App() {
                     </p>
                     <div className="mt-3 md:mt-4 flex items-center gap-2">
                       <span className={cn(
-                        "text-[9px] md:text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded flex items-center gap-1",
+                        "text-[9px] md:text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded",
                         result.source === 'rule-based' ? "bg-green-100 text-green-700" : 
                         result.source.startsWith('offline') ? "bg-amber-100 text-amber-700" :
                         "bg-purple-100 text-purple-700"
                       )}>
-                        {result.source === 'ai' && <Sparkles className="w-2.5 h-2.5" />}
                         {result.source.replace('-', ' ')}
                       </span>
                       <span className="text-[10px] md:text-xs text-gray-400">
