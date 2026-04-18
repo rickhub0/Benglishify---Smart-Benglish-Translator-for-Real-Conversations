@@ -1,10 +1,20 @@
-Benglishify.in Smart-Benglish-Translator-for-Real-Conversations
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-Benglishify.in is the world's most advanced multi-way translator for Benglish (Bengali in Roman script), traditional Bengali, and English. Leveraging the power of Gemini 3 AI, it handles phonetic nuances, slang, and context-dependent disambiguation to provide near-human translation accuracy for the international Bengali community.
+# Run and deploy your AI Studio app
 
-A Precise Definition: Explains what "Benglish" is (Romanized Bengali) and why it's unique.
-Direct Value Proposition: A bold title and description explaining how Benglishify.in acts as a bridge for 300 million people speak in the digital age.
-Key Capabilities Guide:
-Multi-Script Support: Formal English, Bengali Script, and Phonetic Benglish.
-Dialect Awareness: Specific mention of regional dialects like Dhaka, Kolkata, and Sylhet.
-Style & Grammar Assistance: How the app helps with professional and confident communication.
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/a3a7dc09-a696-49ec-86c6-89f9ad938d66
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`

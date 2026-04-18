@@ -49,6 +49,7 @@ function TranslatorContent() {
   const [isListening, setIsListening] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [isVoiceMode, setIsVoiceMode] = useState(true); // Default to voice mode for better UX
+  const [voiceSearchLang, setVoiceSearchLang] = useState<'bn-BD' | 'en-US'>('bn-BD');
   const [isOnline, setIsOnline] = useState(offlineService.isOnline());
   const [translationError, setTranslationError] = useState<string | null>(null);
   
@@ -167,18 +168,25 @@ function TranslatorContent() {
     }
   };
 
-  const handleTranslate = async (overrideDirection?: TranslationDirection) => {
-    if (!inputText.trim()) return;
+  const handleTranslate = async (overrideDirection?: TranslationDirection, overrideText?: string) => {
+    const textToTranslate = overrideText || inputText;
+    if (!textToTranslate.trim()) return;
     setIsLoading(true);
     setTranslationError(null);
     try {
       const translationDirection = overrideDirection || direction;
-      const translation = await translate(inputText, translationDirection, history);
+      const translation = await translate(textToTranslate, translationDirection, history);
       setResult(translation);
+      
+      // For voice input, update the live previews with the AI-refined results
+      if (translation.fullResult) {
+        setLiveBenglish(translation.fullResult.benglish);
+        setLiveBengali(translation.fullResult.bengali);
+      }
       
       // Update history for context
       setHistory(prev => {
-        const newEntry = { input: inputText, output: translation.translatedText };
+        const newEntry = { input: textToTranslate, output: translation.translatedText };
         const updated = [...prev, newEntry];
         return updated.slice(-5); // Keep last 5 for context
       });
@@ -282,8 +290,8 @@ function TranslatorContent() {
     setLiveBenglish("");
     setLiveBengali("");
     
-    // Voice mode always uses Bengali as input
-    const langCode = 'bn-BD';
+    // Determine language code based on current selection
+    const langCode = voiceSearchLang;
 
     speechService.startListening(
       langCode,
@@ -295,7 +303,7 @@ function TranslatorContent() {
         if (isFinal) {
           setIsListening(false);
           // Auto-translate using the special 'voice-input' direction
-          handleTranslate('voice-input' as TranslationDirection);
+          handleTranslate('voice-input' as TranslationDirection, transcript);
         }
       },
       (error) => {
@@ -522,8 +530,33 @@ function TranslatorContent() {
                         "w-2.5 h-2.5 rounded-full",
                         isListening ? "bg-red-500 animate-pulse" : "bg-gray-300"
                       )} />
-                      <span className="text-[11px] font-black tracking-[0.2em] text-gray-400 uppercase">Bengali Input</span>
+                      <span className="text-[11px] font-black tracking-[0.2em] text-gray-400 uppercase">
+                        {voiceSearchLang === 'en-US' ? 'English Input' : 'Bengali Input'}
+                      </span>
                     </div>
+                    
+                    {/* Voice Language Toggle */}
+                    <div className="flex bg-gray-100 p-0.5 rounded-lg text-[9px] font-bold uppercase overflow-hidden">
+                      <button 
+                        onClick={() => setVoiceSearchLang('bn-BD')}
+                        className={cn(
+                          "px-2 py-1 rounded transition-all",
+                          voiceSearchLang === 'bn-BD' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"
+                        )}
+                      >
+                        Bengali
+                      </button>
+                      <button 
+                        onClick={() => setVoiceSearchLang('en-US')}
+                        className={cn(
+                          "px-2 py-1 rounded transition-all",
+                          voiceSearchLang === 'en-US' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"
+                        )}
+                      >
+                        English
+                      </button>
+                    </div>
+
                     {isListening && (
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.8 }}
