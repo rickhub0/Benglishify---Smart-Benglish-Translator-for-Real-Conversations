@@ -92,6 +92,14 @@ export const offlineService = {
     return null;
   },
 
+  clearCache() {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch (e) {
+      console.warn('Failed to clear translation cache', e);
+    }
+  },
+
   isOnline(): boolean {
     return navigator.onLine;
   }

@@ -141,63 +141,73 @@ const benglishKeywords = [
 const englishKeywords = ['the', 'and', 'is', 'are', 'was', 'were', 'have', 'has', 'had', 'will', 'would', 'should', 'could', 'that', 'this', 'those', 'these', 'with', 'from'];
 
 function detectLanguage(text) {
-  const result = { isBenglish: false, isEnglish: false, isBengali: false };
+  const result = { isBenglish: false, isEnglish: false, isBengali: false, confidence: 0, primary: 'unknown' };
   if (!text || text.length < 2) return result;
 
-  // 1. Check for Bengali script directly
-  if (/[\u0980-\u09FF]/.test(text)) {
+  // 1. Script-based detection
+  const bengaliScriptMatch = text.match(/[\u0980-\u09FF]/g);
+  const bengaliScriptCount = bengaliScriptMatch ? bengaliScriptMatch.length : 0;
+  const scriptDensity = bengaliScriptCount / text.length;
+
+  // 2. Token-based scores
+  const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+  if (words.length === 0 && bengaliScriptCount > 0) {
     result.isBengali = true;
-    result.isBenglish = true;
+    result.primary = 'bengali';
+    result.confidence = 1.0;
     return result;
   }
-
-  const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-  if (words.length === 0) return result;
 
   let benglishScore = 0;
-  
-  // Keyword matching (Strong indicator)
-  const matchCount = words.filter(word => benglishKeywords.includes(word)).length;
-  benglishScore += matchCount * 2.5;
-  
-  // Phonetic patterns
-  const phoneticPattern = /(bh|dh|kh|gh|th|ph|ch|jh|sh|aa|ee|oo)/gi;
-  const phoneticMatches = (text.match(phoneticPattern) || []).length;
-  benglishScore += phoneticMatches * 0.4;
-  
-  // Common endings
-  const endingsPattern = /(o|e|i|u)\b/gi;
-  const endingMatches = (text.match(endingsPattern) || []).length;
-  benglishScore += endingMatches * 0.2;
+  let englishScore = 0;
 
-  const density = benglishScore / words.length;
-  
-  if (benglishScore >= 4 || (words.length > 4 && density > 1.2)) {
-    result.isBenglish = true;
+  // Weighted keyword matching
+  words.forEach(word => {
+    if (benglishKeywords.includes(word)) benglishScore += 2.5;
+    if (englishKeywords.includes(word)) englishScore += 2.0;
+  });
+
+  // Phonetic patterns (bh, dh, etc.)
+  const phoneticPattern = /(bh|dh|kh|gh|th|ph|ch|jh|sh|aa|ee|oo|oi|ou)/gi;
+  const phoneticMatches = (text.match(phoneticPattern) || []).length;
+  benglishScore += phoneticMatches * 0.5;
+
+  // Bengali script is the ultimate priority
+  if (bengaliScriptCount > 2 || scriptDensity > 0.1) {
+    result.isBengali = true;
+    result.isBenglish = true; // Benglishify handles both
+    result.primary = 'bengali';
+    result.confidence = Math.min(1.0, scriptDensity * 5 + 0.5);
     return result;
   }
 
-  // English detection
-  const englishMatchCount = words.filter(word => englishKeywords.includes(word)).length;
-  if (englishMatchCount > 0 || words.length > 5) {
+  // Calculate densities for English vs Benglish
+  const wordCount = words.length || 1;
+  const benglishDensity = benglishScore / wordCount;
+  const englishDensity = englishScore / wordCount;
+
+  if (benglishScore >= 3.5 || benglishDensity > 0.8) {
+    result.isBenglish = true;
+    result.primary = 'benglish';
+    result.confidence = Math.min(0.95, benglishDensity / 2 + 0.4);
+    
+    // If there's high English density too, it's mixed
+    if (englishDensity > 1.0) {
+      result.isMixed = true;
+    }
+    return result;
+  }
+
+  if (englishScore >= 2 || englishDensity > 0.5 || words.length > 5) {
     result.isEnglish = true;
+    result.primary = 'english';
+    result.confidence = Math.min(0.9, englishDensity / 2 + 0.3);
   }
 
   return result;
 }
 
-// Keep for backward compatibility with auto-translate logic
-function looksLikeBenglish(text) {
-  return detectLanguage(text).isBenglish;
-}
-
 // Caching logic for persistent translations
-async function getCachedTranslation(text) {
-  const result = await chrome.storage.local.get(['translationCache']);
-  const cache = result.translationCache || {};
-  return cache[text];
-}
-
 async function saveToCache(original, translated) {
   const result = await chrome.storage.local.get(['translationCache']);
   const cache = result.translationCache || {};
@@ -238,10 +248,11 @@ document.addEventListener('mouseover', (e) => {
     hoverTimeout = setTimeout(() => {
       const lang = detectLanguage(text);
       
-      if (lang.isBenglish) {
-        // Auto-translate Benglish on hover if it's not already translated
+      if (lang.isBengali || lang.isBenglish) {
+        // Auto-translate Benglish/Bengali on hover if it's not already translated
         if (!target.hasAttribute('data-benglish-translated') && !target.closest('[data-benglish-translated]')) {
-          showTooltip(text, e.pageX, e.pageY, 'benglish-to-english');
+          const direction = lang.primary === 'bengali' ? 'bengali-to-english' : 'benglish-to-english';
+          showTooltip(text, e.pageX, e.pageY, direction);
         }
       } else if (lang.isEnglish) {
         // Offer translation for English
@@ -265,25 +276,20 @@ document.addEventListener('mouseup', (e) => {
   }
 });
 
-// Auto-translate logic (Efficient scanning with caching and MutationObserver)
-let scanTimeout = null;
-let observer = null;
-
+// Updated auto-translation logic to use refined detection
 async function autoTranslatePage(root = document.body) {
   if (!settings.autoTranslate) return;
 
-  // Load cache once for efficiency
-  const result = await chrome.storage.local.get(['translationCache']);
-  const cache = result.translationCache || {};
+  const resultStore = await chrome.storage.local.get(['translationCache']);
+  const cache = resultStore.translationCache || {};
 
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (node) => {
-      // Skip script, style, and already translated tags
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
       
       const tagName = parent.tagName.toLowerCase();
-      if (['script', 'style', 'textarea', 'input', 'code', 'pre'].includes(tagName)) {
+      if (['script', 'style', 'textarea', 'input', 'code', 'pre', 'noscript'].includes(tagName)) {
         return NodeFilter.FILTER_REJECT;
       }
       
@@ -300,23 +306,28 @@ async function autoTranslatePage(root = document.body) {
   
   while (node = walker.nextNode()) {
     const text = node.nodeValue.trim();
-    if (text.length > 3 && looksLikeBenglish(text)) {
-      nodesToTranslate.push(node);
+    if (text.length < 3) continue;
+
+    const lang = detectLanguage(text);
+    // Auto-translate if it is Bengali script or high-confidence Benglish
+    if (lang.isBengali || (lang.isBenglish && lang.confidence > 0.6)) {
+      nodesToTranslate.push({
+        node,
+        text,
+        direction: lang.primary === 'bengali' ? 'bengali-to-english' : 'benglish-to-english'
+      });
     }
   }
 
-  // Process nodes (Batch processing to avoid UI lag)
-  for (const textNode of nodesToTranslate) {
-    const originalText = textNode.nodeValue.trim();
-    if (cache[originalText]) {
-      applyTranslation(textNode, cache[originalText]);
+  // Batch process to avoid UI jank
+  for (const item of nodesToTranslate) {
+    if (cache[item.text]) {
+      applyTranslation(item.node, cache[item.text]);
     } else {
-      // Small delay for non-cached items to avoid hitting API limits too fast
-      await translateNode(textNode);
+      await translateNode(item.node, item.direction);
     }
   }
   
-  // Start observing for dynamic content after initial scan
   if (!observer && root === document.body) {
     setupMutationObserver();
   }
@@ -354,13 +365,14 @@ function setupMutationObserver() {
   });
 }
 
-async function translateNode(node) {
+async function translateNode(node, forcedDirection) {
   const originalText = node.nodeValue.trim();
   try {
+    const direction = forcedDirection || settings.languageMode;
     const response = await chrome.runtime.sendMessage({
       action: "translate",
       text: originalText,
-      direction: settings.languageMode
+      direction: direction
     });
     
     if (response.translatedText && response.translatedText !== originalText) {

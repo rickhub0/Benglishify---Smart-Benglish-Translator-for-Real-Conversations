@@ -1,6 +1,6 @@
 {
-  "name": "Benglishify.pro",
-  "description": "Smart Benglish-to-English and English-to-Benglish translator with AI-powered context awareness.",
+  "name": "Benglishify.in",
+  "description": "Benglishify.in is the world's most advanced multi-way translator for Benglish (Bengali in Roman script), traditional Bengali, and English. Leveraging the power of Gemini 3 AI, it handles phonetic nuances, slang, and context-dependent disambiguation to provide near-human translation accuracy for the international Bengali community.",
   "requestFramePermissions": [
     "microphone"
   ]

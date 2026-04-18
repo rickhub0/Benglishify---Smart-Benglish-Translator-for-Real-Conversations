@@ -17,8 +17,10 @@ import { offlineService } from "./services/offlineService";
 import { cn } from "./lib/utils";
 import { auth } from "./firebase";
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import AboutPage from "./pages/About";
 
-export default function App() {
+function TranslatorContent() {
   const [inputText, setInputText] = useState("");
   const [direction, setDirection] = useState<TranslationDirection>('benglish-to-english');
   const [result, setResult] = useState<TranslationResult | null>(null);
@@ -825,6 +827,18 @@ export default function App() {
                       <span className="text-[10px] md:text-xs text-gray-400">
                         Confidence: {(result.confidence * 100).toFixed(0)}%
                       </span>
+                      <button
+                        onClick={() => {
+                          setSuggestedText("");
+                          setCorrectionStatus(null);
+                          setShowCorrectionModal(true);
+                        }}
+                        className="ml-auto md:ml-2 flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-orange-50 text-orange-600 transition-colors text-[9px] md:text-[10px] font-bold uppercase tracking-wider border border-orange-100/50"
+                        title="Suggest a better translation"
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                        Suggest Correction
+                      </button>
                     </div>
                   </motion.div>
                 ) : (
@@ -851,19 +865,6 @@ export default function App() {
                     <Volume2 className="w-4 h-4 md:w-5 md:h-5" />
                   </button>
                   <button
-                    onClick={() => {
-                      setSuggestedText("");
-                      setCorrectionStatus(null);
-                      setShowCorrectionModal(true);
-                    }}
-                    className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-lg hover:bg-orange-100 text-orange-600 transition-colors text-[10px] md:text-xs font-medium border border-orange-100"
-                    title="Suggest a better translation"
-                  >
-                    <AlertCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                    <span className="hidden xs:inline">Suggest Correction</span>
-                    <span className="xs:hidden">Correct</span>
-                  </button>
-                  <button
                     onClick={copyToClipboard}
                     className="p-1.5 md:p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors relative"
                     title="Copy to clipboard"
@@ -885,12 +886,27 @@ export default function App() {
                 <History className="w-3 h-3" />
                 Recent Context
               </h4>
-              <button 
-                onClick={() => setHistory([])}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Clear Context
-              </button>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setHistory([])}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  title="Clear context for next translation"
+                >
+                  Clear Context
+                </button>
+                <button 
+                  onClick={() => {
+                    if (confirm("This will clear your recent context and persistent translation history. Are you sure?")) {
+                      setHistory([]);
+                      offlineService.clearCache();
+                    }
+                  }}
+                  className="text-xs text-red-600 hover:text-red-700 font-medium"
+                  title="Clear context and offline cache"
+                >
+                  Clear All History
+                </button>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {history.map((item, idx) => (
@@ -1130,11 +1146,18 @@ export default function App() {
       <footer className="mt-auto py-8 md:py-12 px-4 md:px-6 border-t border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-center md:text-left">
-            <h2 className="text-lg font-bold text-gray-900 mb-1">Benglishify.pro</h2>
-            <p className="text-gray-400 text-xs md:text-sm">© 2026 Benglishify.pro. Built by @Clickors for the Bengali community.</p>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Benglishify.in</h2>
+            <p className="text-gray-400 text-xs md:text-sm">© 2026 Benglishify.in for the Bengali community.</p>
           </div>
           
           <div className="flex items-center gap-6">
+            <Link 
+              to="/about" 
+              className="text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <Info className="w-5 h-5" />
+              <span>About</span>
+            </Link>
             <a 
               href="https://github.com/rickhub0" 
               target="_blank" 
@@ -1257,5 +1280,16 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<TranslatorContent />} />
+        <Route path="/about" element={<AboutPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
