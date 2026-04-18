@@ -389,7 +389,8 @@ function TranslatorContent() {
     <div className="min-h-screen bg-[#F8F9FA] text-[#202124] font-sans selection:bg-blue-100 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 md:gap-3">
+          <img src="/logo.png" alt="Benglishify Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain" />
           <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center">
             <span className="text-gray-900">বেং</span>
             <span className="text-[#C25400]">lish</span>

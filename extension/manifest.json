@@ -3,6 +3,11 @@
   "name": "Benglishify - Smart Benglish Translator",
   "version": "1.0",
   "description": "Smart Benglish-to-English and English-to-Benglish translator with AI-powered context awareness.",
+  "icons": {
+    "16": "logo.png",
+    "48": "logo.png",
+    "128": "logo.png"
+  },
   "permissions": [
     "activeTab",
     "scripting",
