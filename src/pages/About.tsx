@@ -1,3 +1,4 @@
+import logo from "/public/logo.png";
 import { Info, Sparkles, ArrowRightLeft, Wifi, Github, Instagram, Languages } from "lucide-react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
@@ -8,7 +9,7 @@ export default function AboutPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10">
         <Link to="/" className="flex items-center gap-2 md:gap-3">
-          <img src="/logo.png" alt="Benglishify Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain" />
+          <img src={logo} alt="Benglishify Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain" referrerPolicy="no-referrer" />
           <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center">
             <span className="text-gray-900">বেং</span>
             <span className="text-[#C25400]">lish</span>
