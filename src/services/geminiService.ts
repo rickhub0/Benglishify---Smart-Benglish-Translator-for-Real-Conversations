@@ -73,20 +73,23 @@ export async function translateWithAI(text: string, direction: TranslationDirect
 
     switch (direction) {
       case 'benglish-to-english':
-        systemInstruction = "Translate Benglish (Bengali in English letters) to natural English. Precise, contextual, and handle slang. " + contextPrompt;
+        systemInstruction = "Translate Benglish (Bengali in English letters) to natural English. Return ONLY the translated text, no alternatives or explanations. Handle slang naturally.";
         break;
       case 'english-to-benglish':
-        systemInstruction = "Translate English to natural Benglish (Bengali in English letters). Use common phonetic spellings used in social media. " + contextPrompt;
+        systemInstruction = "Translate English to natural Benglish (Bengali in English letters). Use common phonetic spellings found in social media. Return ONLY the translated text.";
         break;
       case 'bengali-to-english':
-        systemInstruction = "Translate Bengali script to natural English. Concise and accurate. " + contextPrompt;
+        systemInstruction = "Translate Bengali script to natural English. Return ONLY the translated text.";
         break;
       case 'english-to-bengali':
-        systemInstruction = "Translate English to natural Bengali script. Correct grammar and tone. " + contextPrompt;
+        systemInstruction = "Translate English to natural Bengali script. Correct grammar and tone. Return ONLY the translated text.";
         break;
       default:
-        systemInstruction = "Translate between English, Bengali, and Benglish." + contextPrompt;
+        systemInstruction = "Translate between English, Bengali, and Benglish. Return ONLY the translated text.";
     }
+    
+    // Add context if available
+    systemInstruction += contextPrompt;
 
     const response = await ai.models.generateContent({
       model: modelName,

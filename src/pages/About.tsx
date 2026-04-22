@@ -1,5 +1,5 @@
 // @ts-ignore
-import logo from "/public/logo.png";
+const logo = "https://benglishify.in/logo.png";
 import { Info, Sparkles, ArrowRightLeft, Github, Instagram, Languages, Sun, Moon } from "lucide-react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";

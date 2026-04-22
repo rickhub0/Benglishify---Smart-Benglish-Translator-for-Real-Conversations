@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
 // @ts-ignore
-import logo from "/public/logo.png";
+const logo = "https://benglishify.in/logo.png";
 
 export default function InstallGuide() {
   const containerVariants = {

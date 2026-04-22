@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { cn } from "../lib/utils";
 // @ts-ignore
-import logo from "/public/logo.png";
+const logo = "https://benglishify.in/logo.png";
 
 export default function Header() {
   const { user, isLoading, login, logout } = useAuth();
