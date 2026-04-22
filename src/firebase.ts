@@ -21,7 +21,7 @@ async function testConnection() {
   } catch (error: any) {
     console.error("Firestore connection test failed:", error.message);
     if (error.message.includes('the client is offline') || error.message.includes('unavailable')) {
-      console.warn("Firestore is currently unreachable. The app will continue in offline mode.");
+      console.warn("Firestore is currently unreachable. Please check your internet connection.");
     }
   }
 }

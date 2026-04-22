@@ -3,23 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// @ts-ignore
 import logo from "/public/logo.png";
 import { useState, useEffect } from "react";
-import { Languages, ArrowRightLeft, Copy, Check, Sparkles, History, Info, Loader2, Settings, Upload, X, AlertCircle, LogIn, LogOut, User, ChevronDown, Mic, MicOff, Volume2, Wifi, WifiOff, CheckCircle, XCircle, Wand2, Github, Instagram } from "lucide-react";
+import { Languages, ArrowRightLeft, Copy, Check, Sparkles, History, Info, Loader2, Settings, X, AlertCircle, LogIn, LogOut, User, ChevronDown, Mic, MicOff, Volume2, CheckCircle, XCircle, Wand2, Github, Instagram, Share2, Smartphone, Moon, Sun } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { translate, TranslationResult, syncMasterDictionary } from "./services/translationService";
-import { importCSVData } from "./services/importService";
 import { submitCorrection } from "./services/correctionService";
 import { speechService } from "./services/speechService";
 import { transliterationService } from "./services/transliterationService";
 import { checkGrammar, GrammarCheckResult } from "./services/grammarlyService";
 import { TranslationDirection, ConversationContext } from "./services/geminiService";
-import { offlineService } from "./services/offlineService";
 import { cn } from "./lib/utils";
 import { auth } from "./firebase";
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import AboutPage from "./pages/About";
+import InstallGuide from "./pages/InstallGuide";
+import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 
 function TranslatorContent() {
   const [inputText, setInputText] = useState("");
@@ -29,16 +30,12 @@ function TranslatorContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   
+  // Theme State
+  const { isDarkMode, toggleDarkMode } = useTheme();
+
   // Auth State
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-
-  // Admin / Import State
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [csvInput, setCsvInput] = useState("");
-  const [importFormat, setImportFormat] = useState<'benglish-first' | 'english-first'>('benglish-first');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState<{ success?: boolean; message?: string } | null>(null);
 
   // Correction State
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -51,7 +48,6 @@ function TranslatorContent() {
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [isVoiceMode, setIsVoiceMode] = useState(true); // Default to voice mode for better UX
   const [voiceSearchLang, setVoiceSearchLang] = useState<'bn-BD' | 'en-US'>('bn-BD');
-  const [isOnline, setIsOnline] = useState(offlineService.isOnline());
   const [translationError, setTranslationError] = useState<string | null>(null);
   
   // Live Voice State
@@ -74,9 +70,10 @@ function TranslatorContent() {
     }
 
     // Faster debounce for "live" feel
+    const debounceTime = inputText.length < 10 ? 150 : 300;
     const timer = setTimeout(() => {
       handleTranslate();
-    }, 500); 
+    }, debounceTime); 
 
     return () => clearTimeout(timer);
   }, [inputText, direction, isVoiceMode]);
@@ -84,46 +81,7 @@ function TranslatorContent() {
   // Live translation for immediate feedback
   const handleLiveTranslate = (text: string) => {
     if (!text.trim() || isVoiceMode) return;
-    
-    // 1. Check Offline Cache/Dictionary first for immediate result
-    const cached = offlineService.getFromCache(text, direction);
-    if (cached) {
-      setResult({
-        ...cached,
-        source: 'offline-cache'
-      });
-      return;
-    }
-
-    const dictMatch = offlineService.lookupInDictionary(text, direction);
-    if (dictMatch) {
-      setResult({
-        translatedText: dictMatch,
-        confidence: 0.95,
-        source: 'offline-dictionary'
-      });
-      return;
-    }
-
-    // 2. If no full match, try word-by-word for very fast feedback (only for Benglish to English)
-    if (direction === 'benglish-to-english') {
-      const words = text.toLowerCase().trim().split(/\s+/);
-      if (words.length > 1) {
-        const translatedWords = words.map(word => {
-          const match = offlineService.lookupInDictionary(word, direction);
-          return match || word;
-        });
-        
-        // Only show if at least one word was translated
-        if (translatedWords.some((w, i) => w !== words[i])) {
-          setResult({
-            translatedText: translatedWords.join(' '),
-            confidence: 0.5,
-            source: 'offline-dictionary'
-          });
-        }
-      }
-    }
+    // Word-by-word or dictionary logic removed to simplify for real-time cloud AI only
   };
 
   useEffect(() => {
@@ -135,16 +93,8 @@ function TranslatorContent() {
       }
     });
 
-    // Offline handling
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
     return () => {
       unsubscribe();
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
@@ -172,7 +122,9 @@ function TranslatorContent() {
   const handleTranslate = async (overrideDirection?: TranslationDirection, overrideText?: string) => {
     const textToTranslate = overrideText || inputText;
     if (!textToTranslate.trim()) return;
-    setIsLoading(true);
+    
+    // Only show loading if it's taking more than 200ms to avoid flickering for cached results
+    const loadingTimer = setTimeout(() => setIsLoading(true), 200);
     setTranslationError(null);
     try {
       const translationDirection = overrideDirection || direction;
@@ -195,27 +147,32 @@ function TranslatorContent() {
       console.error("Translation error:", error);
       setTranslationError(error.message || "An unexpected error occurred during translation.");
     } finally {
+      clearTimeout(loadingTimer);
       setIsLoading(false);
     }
   };
 
-  const handleImport = async () => {
-    if (!csvInput.trim()) return;
-    setIsImporting(true);
-    setImportStatus(null);
-    try {
-      const count = await importCSVData(csvInput, importFormat);
-      setImportStatus({ success: true, message: `Successfully imported ${count} translations!` });
-      setCsvInput("");
-    } catch (error: any) {
-      console.error("Import error:", error);
-      let message = "Import failed. Check console for details.";
-      if (error.message?.includes("insufficient permissions")) {
-        message = "Permission Denied: You must be logged in as an admin (royrk3369@gmail.com) to import data.";
+  const handleShareResult = async () => {
+    if (!result) return;
+    
+    const sourceLang = direction.includes('benglish') ? 'Benglish' : direction.includes('bengali') ? 'Bengali' : 'English';
+    const targetLang = direction.endsWith('english') ? 'English' : direction.endsWith('benglish') ? 'Benglish' : 'Bengali';
+    
+    const shareText = `Benglishify.in | Smart Translator\n\n${sourceLang}: ${inputText}\n${targetLang}: ${result.translatedText}\n\n✨ Translated via https://benglishify.in`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Benglishify.in Translation',
+          text: shareText,
+          url: 'https://benglishify.in'
+        });
+      } catch (err) {
+        // Fallback if user cancels or error
+        copyToClipboard(shareText);
       }
-      setImportStatus({ success: false, message });
-    } finally {
-      setIsImporting(false);
+    } else {
+      copyToClipboard(shareText);
     }
   };
 
@@ -269,15 +226,14 @@ function TranslatorContent() {
     }
   };
 
-  const copyToClipboard = () => {
-    if (result?.translatedText) {
-      navigator.clipboard.writeText(result.translatedText);
+  const copyToClipboard = (text?: string) => {
+    const textToCopy = text || result?.translatedText;
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  const isAdmin = user?.email === "royrk3369@gmail.com";
 
   const handleVoiceInput = () => {
     if (isListening) {
@@ -309,7 +265,7 @@ function TranslatorContent() {
       },
       (error) => {
         console.error("Speech error:", error);
-        setSpeechError(`Speech error: ${error}`);
+        setSpeechError(error);
         setIsListening(false);
       },
       () => {
@@ -385,45 +341,38 @@ function TranslatorContent() {
 
   const getSpeechErrorMessage = (error: string) => {
     const err = error.toLowerCase();
-    if (err.includes('no-speech')) return "No speech was detected. Please try again.";
-    if (err.includes('audio-capture')) return "Audio capture failed. Please check your microphone.";
+    if (err.includes('no-speech')) return "No speech was detected. Please try again and speak clearly.";
+    if (err.includes('audio-capture')) return "No microphone found. Please ensure your mic is connected and working.";
     if (err.includes('not-allowed') || err.includes('permission')) return "Microphone access denied. Please enable it in your browser settings.";
-    if (err.includes('network')) return "Network error during speech recognition.";
+    if (err.includes('network')) return "Network error. Please check your internet connection.";
     if (err.includes('aborted')) return "Speech recognition was aborted.";
-    if (err.includes('not supported')) return "Speech recognition is not supported in this browser. Try Chrome.";
-    return error;
+    if (err.includes('language-not-supported')) return "This language is not supported for voice input in your browser.";
+    if (err.includes('not supported')) return "Speech recognition is not supported in this browser. Try using Chrome for the best experience.";
+    return error || "An unexpected error occurred with voice input.";
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#202124] font-sans selection:bg-blue-100 flex flex-col">
+    <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#121212] text-[#202124] dark:text-gray-100 font-sans selection:bg-blue-100 transition-colors duration-300 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="bg-white dark:bg-[#1E1E1E] border-b border-gray-200 dark:border-[#2E2E2E] px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10 transition-colors">
         <div className="flex items-center gap-2 md:gap-3">
           <img src={logo} alt="Benglishify Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain" referrerPolicy="no-referrer" />
           <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center">
-            <span className="text-gray-900">বেং</span>
-            <span className="text-[#C25400]">lish</span>
-            <span className="text-gray-900">ify</span>
+            <span className="text-gray-900 dark:text-white">বেং</span>
+            <span className="text-[#C25400] dark:text-[#FF8C00]">lish</span>
+            <span className="text-gray-900 dark:text-white">ify</span>
           </h1>
-          {!isOnline && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100 text-[10px] md:text-xs font-bold uppercase tracking-wider animate-pulse">
-              <WifiOff className="w-3 h-3 md:w-3.5 md:h-3.5" />
-              Offline
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-1 md:gap-2">
-          {isAdmin && (
-            <button 
-              onClick={() => setShowImportModal(true)}
-              className="text-gray-500 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition-colors"
-              title="Import Data"
-            >
-              <Upload className="w-5 h-5" />
-            </button>
-          )}
-          
-          <div className="hidden md:block h-6 w-[1px] bg-gray-200 mx-1" />
+          <button 
+            onClick={toggleDarkMode}
+            className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-full hover:bg-blue-50 dark:hover:bg-[#2E2E2E] transition-colors"
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+
+          <div className="hidden md:block h-6 w-[1px] bg-gray-200 dark:bg-[#2E2E2E] mx-1" />
 
           {isAuthLoading ? (
             <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
@@ -492,12 +441,12 @@ function TranslatorContent() {
           )}
 
           <div className="flex justify-center">
-            <div className="bg-gray-100 p-1 rounded-xl flex gap-1">
+            <div className="bg-gray-100 dark:bg-[#1E1E1E] p-1 rounded-xl flex gap-1 border border-transparent dark:border-[#2E2E2E]">
               <button 
                 onClick={() => setIsVoiceMode(true)}
                 className={cn(
                   "px-4 md:px-6 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-2",
-                  isVoiceMode ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  isVoiceMode ? "bg-white dark:bg-[#2E2E2E] text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 )}
               >
                 <Mic className="w-3.5 h-3.5 md:w-4 md:h-4" />
@@ -507,7 +456,7 @@ function TranslatorContent() {
                 onClick={() => setIsVoiceMode(false)}
                 className={cn(
                   "px-4 md:px-6 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-2",
-                  !isVoiceMode ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  !isVoiceMode ? "bg-white dark:bg-[#2E2E2E] text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 )}
               >
                 <Languages className="w-3.5 h-3.5 md:w-4 md:h-4" />
@@ -524,25 +473,25 @@ function TranslatorContent() {
               
               {/* Left Side: Input (Benglish + Bengali) */}
               <div className="flex flex-col gap-4">
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 md:p-10 flex-1 flex flex-col gap-6 relative overflow-hidden">
+                <div className="bg-white dark:bg-[#1E1E1E] rounded-3xl shadow-sm border border-gray-100 dark:border-[#2E2E2E] p-6 md:p-10 flex-1 flex flex-col gap-6 relative overflow-hidden transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className={cn(
                         "w-2.5 h-2.5 rounded-full",
-                        isListening ? "bg-red-500 animate-pulse" : "bg-gray-300"
+                        isListening ? "bg-red-500 animate-pulse" : "bg-gray-300 dark:bg-gray-700"
                       )} />
-                      <span className="text-[11px] font-black tracking-[0.2em] text-gray-400 uppercase">
+                      <span className="text-[11px] font-black tracking-[0.2em] text-gray-400 dark:text-gray-500 uppercase">
                         {voiceSearchLang === 'en-US' ? 'English Input' : 'Bengali Input'}
                       </span>
                     </div>
                     
                     {/* Voice Language Toggle */}
-                    <div className="flex bg-gray-100 p-0.5 rounded-lg text-[9px] font-bold uppercase overflow-hidden">
+                    <div className="flex bg-gray-100 dark:bg-[#2E2E2E] p-0.5 rounded-lg text-[9px] font-bold uppercase overflow-hidden border border-transparent dark:border-[#3E3E3E]">
                       <button 
                         onClick={() => setVoiceSearchLang('bn-BD')}
                         className={cn(
                           "px-2 py-1 rounded transition-all",
-                          voiceSearchLang === 'bn-BD' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"
+                          voiceSearchLang === 'bn-BD' ? "bg-white dark:bg-[#3E3E3E] text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-400 dark:text-gray-500"
                         )}
                       >
                         Bengali
@@ -551,7 +500,7 @@ function TranslatorContent() {
                         onClick={() => setVoiceSearchLang('en-US')}
                         className={cn(
                           "px-2 py-1 rounded transition-all",
-                          voiceSearchLang === 'en-US' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"
+                          voiceSearchLang === 'en-US' ? "bg-white dark:bg-[#3E3E3E] text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-400 dark:text-gray-500"
                         )}
                       >
                         English
@@ -573,11 +522,11 @@ function TranslatorContent() {
                   <div className="flex-1 flex flex-col gap-8 justify-center">
                     {/* Primary: Benglish */}
                     <div className="flex flex-col gap-2">
-                      <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Benglish</span>
+                      <span className="text-[10px] font-bold text-blue-500 dark:text-blue-400 uppercase tracking-widest">Benglish</span>
                       <div className={cn(
                         "text-3xl md:text-5xl font-black leading-[1.1] tracking-tight transition-all",
-                        isListening ? "text-blue-600" : "text-gray-900",
-                        !liveBenglish && !isListening && "text-gray-200"
+                        isListening ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-white",
+                        !liveBenglish && !isListening && "text-gray-200 dark:text-gray-800"
                       )}>
                         {liveBenglish || (isListening ? "..." : "Speak now")}
                       </div>
@@ -585,11 +534,11 @@ function TranslatorContent() {
 
                     {/* Secondary: Bengali Script */}
                     <div className="flex flex-col gap-2">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bengali Script</span>
+                      <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Bengali Script</span>
                       <div className={cn(
                         "text-xl md:text-2xl font-medium leading-relaxed transition-all",
-                        isListening ? "text-gray-500" : "text-gray-400",
-                        !liveBengali && !isListening && "text-gray-100"
+                        isListening ? "text-gray-500 dark:text-gray-400" : "text-gray-400 dark:text-gray-500",
+                        !liveBengali && !isListening && "text-gray-100 dark:text-[#1A1A1A]"
                       )}>
                         {liveBengali || (isListening ? "..." : "আপনার কথা বলুন")}
                       </div>
@@ -634,15 +583,15 @@ function TranslatorContent() {
               {/* Right Side: Output (English) */}
               <div className="flex flex-col">
                 <div className={cn(
-                  "bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-10 flex-1 flex flex-col gap-6 relative transition-all",
+                  "bg-white dark:bg-[#1E1E1E] rounded-3xl shadow-xl border border-gray-100 dark:border-[#2E2E2E] p-6 md:p-10 flex-1 flex flex-col gap-6 relative transition-all",
                   isLoading && "opacity-60 grayscale-[0.5]"
                 )}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                      <span className="text-[11px] font-black tracking-[0.2em] text-gray-400 uppercase">English Translation</span>
+                      <span className="text-[11px] font-black tracking-[0.2em] text-gray-400 dark:text-gray-500 uppercase">English Translation</span>
                     </div>
-                    {isLoading && <Loader2 className="w-5 h-5 animate-spin text-blue-500" />}
+                    {isLoading && <Loader2 className="w-5 h-5 animate-spin text-blue-500 dark:text-blue-400" />}
                   </div>
 
                   <div className="flex-1 flex flex-col justify-center">
@@ -654,26 +603,26 @@ function TranslatorContent() {
                           animate={{ opacity: 1, x: 0 }}
                           className="flex flex-col gap-6"
                         >
-                          <div className="text-2xl md:text-4xl font-bold text-gray-800 leading-tight">
+                          <div className="text-2xl md:text-4xl font-bold text-gray-800 dark:text-white leading-tight">
                             {result.fullResult?.english || result.translatedText}
                           </div>
                           
                           <div className="flex items-center gap-3">
-                            <span className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-100">
+                            <span className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-100 dark:border-green-900/30">
                               {result.source.replace('-', ' ')}
                             </span>
                             <div className="flex gap-2">
-                              <button onClick={handleSpeak} className="p-3 rounded-2xl bg-gray-50 hover:bg-gray-100 text-gray-500 transition-all">
+                              <button onClick={handleSpeak} className="p-3 rounded-2xl bg-gray-50 dark:bg-[#2E2E2E] hover:bg-gray-100 dark:hover:bg-[#3E3E3E] text-gray-500 dark:text-gray-400 transition-all">
                                 <Volume2 className="w-5 h-5" />
                               </button>
-                              <button onClick={copyToClipboard} className="p-3 rounded-2xl bg-gray-50 hover:bg-gray-100 text-gray-500 transition-all">
-                                {copied ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5" />}
+                              <button onClick={() => copyToClipboard()} className="p-3 rounded-2xl bg-gray-50 dark:bg-[#2E2E2E] hover:bg-gray-100 dark:hover:bg-[#3E3E3E] text-gray-500 dark:text-gray-400 transition-all">
+                                {copied ? <Check className="w-5 h-5 text-green-600 dark:text-green-400" /> : <Copy className="w-5 h-5" />}
                               </button>
                             </div>
                           </div>
                         </motion.div>
                       ) : (
-                        <div className="text-gray-200 text-2xl md:text-4xl font-bold italic">
+                        <div className="text-gray-200 dark:text-[#2A2A2A] text-2xl md:text-4xl font-bold italic">
                           {isLoading ? "Translating..." : "Translation will appear here"}
                         </div>
                       )}
@@ -689,7 +638,7 @@ function TranslatorContent() {
                     setLiveBenglish("");
                     setLiveBengali("");
                   }}
-                  className="mt-4 flex items-center justify-center gap-2 py-4 rounded-3xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all text-[10px] font-black uppercase tracking-widest"
+                  className="mt-4 flex items-center justify-center gap-2 py-4 rounded-3xl text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#1A1A1A] transition-all text-[10px] font-black uppercase tracking-widest"
                 >
                   <X className="w-4 h-4" />
                   Reset Session
@@ -770,7 +719,7 @@ function TranslatorContent() {
                 <motion.div 
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="absolute top-3 md:top-4 left-4 md:left-6 flex items-center gap-2 bg-red-100 text-red-600 px-2 md:px-3 py-0.5 md:py-1 rounded-full border border-red-200 text-[9px] md:text-[10px] font-bold tracking-widest uppercase z-10"
+                  className="absolute top-3 md:top-4 left-4 md:left-6 flex items-center gap-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 md:px-3 py-0.5 md:py-1 rounded-full border border-red-200 dark:border-red-900/30 text-[9px] md:text-[10px] font-bold tracking-widest uppercase z-10"
                 >
                   <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-ping" />
                   Listening...
@@ -785,8 +734,8 @@ function TranslatorContent() {
                 }}
                 placeholder={isListening ? "Speak now..." : `Enter ${getSourceLang()}...`}
                 className={cn(
-                  "w-full h-full min-h-[150px] md:min-h-[200px] resize-none border-none focus:ring-0 text-lg md:text-xl placeholder:text-gray-300 bg-transparent transition-all",
-                  isListening && "placeholder:text-red-300"
+                  "w-full h-full min-h-[150px] md:min-h-[200px] resize-none border-none focus:ring-0 text-lg md:text-xl placeholder:text-gray-300 dark:placeholder:text-[#2A2A2A] bg-transparent text-gray-800 dark:text-white transition-all outline-none",
+                  isListening && "placeholder:text-red-300 dark:placeholder:text-red-900/50"
                 )}
               />
               {inputText && !isListening && (
@@ -795,19 +744,19 @@ function TranslatorContent() {
                     setInputText("");
                     setResult(null);
                   }}
-                  className="absolute top-4 md:top-6 right-4 md:right-6 p-1.5 rounded-full hover:bg-gray-100 text-gray-400 transition-all"
+                  className="absolute top-4 md:top-6 right-4 md:right-6 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#2E2E2E] text-gray-400 dark:text-gray-500 transition-all font-sans"
                   title="Clear text"
                 >
                   <X className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
               )}
               <div className="absolute bottom-4 md:bottom-6 right-4 md:right-6 flex items-center gap-2 md:gap-3">
-                <span className="text-[10px] md:text-xs text-gray-400">{inputText.length} / 5000</span>
+                <span className="text-[10px] md:text-xs text-gray-400 dark:text-gray-600 font-sans">{inputText.length} / 5000</span>
                 <button
                   onClick={handleVoiceInput}
                   className={cn(
                     "p-1.5 md:p-2 rounded-full transition-all",
-                    isListening ? "bg-red-100 text-red-600 animate-pulse" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    isListening ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse" : "bg-gray-100 dark:bg-[#2E2E2E] text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#3E3E3E]"
                   )}
                   title={isListening ? "Stop listening" : "Start voice input"}
                 >
@@ -819,8 +768,8 @@ function TranslatorContent() {
                   className={cn(
                     "p-1.5 md:p-2 rounded-lg transition-colors",
                     inputText.trim() && !direction.startsWith('bengali')
-                      ? "text-blue-500 hover:bg-blue-50" 
-                      : "text-gray-300 cursor-not-allowed"
+                      ? "text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20" 
+                      : "text-gray-300 dark:text-gray-700 cursor-not-allowed"
                   )}
                   title="Check Grammar"
                 >
@@ -835,7 +784,7 @@ function TranslatorContent() {
 
             {/* Output Area */}
             <div className={cn(
-              "p-4 md:p-6 bg-gray-50/30 relative flex flex-col",
+              "p-4 md:p-6 bg-gray-50/30 dark:bg-black/10 relative flex flex-col",
               isLoading && "opacity-60"
             )}>
               <AnimatePresence mode="wait">
@@ -847,19 +796,18 @@ function TranslatorContent() {
                     exit={{ opacity: 0, y: -10 }}
                     className="flex-1"
                   >
-                    <p className="text-lg md:text-xl leading-relaxed text-gray-800">
+                    <p className="text-lg md:text-xl leading-relaxed text-gray-800 dark:text-gray-200 font-sans">
                       {result.translatedText}
                     </p>
                     <div className="mt-3 md:mt-4 flex items-center gap-2">
                       <span className={cn(
-                        "text-[9px] md:text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded",
-                        result.source === 'rule-based' ? "bg-green-100 text-green-700" : 
-                        result.source.startsWith('offline') ? "bg-amber-100 text-amber-700" :
-                        "bg-purple-100 text-purple-700"
+                        "text-[9px] md:text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded font-sans",
+                        result.source === 'rule-based' ? "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400" : 
+                        "bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400"
                       )}>
                         {result.source.replace('-', ' ')}
                       </span>
-                      <span className="text-[10px] md:text-xs text-gray-400">
+                      <span className="text-[10px] md:text-xs text-gray-400 dark:text-gray-600 font-sans">
                         Confidence: {(result.confidence * 100).toFixed(0)}%
                       </span>
                       <button
@@ -868,7 +816,7 @@ function TranslatorContent() {
                           setCorrectionStatus(null);
                           setShowCorrectionModal(true);
                         }}
-                        className="ml-auto md:ml-2 flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-orange-50 text-orange-600 transition-colors text-[9px] md:text-[10px] font-bold uppercase tracking-wider border border-orange-100/50"
+                        className="ml-auto md:ml-2 flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/10 text-orange-600 dark:text-orange-400 transition-colors text-[9px] md:text-[10px] font-bold uppercase tracking-wider border border-orange-100/50 dark:border-orange-900/30 font-sans"
                         title="Suggest a better translation"
                       >
                         <AlertCircle className="w-3 h-3" />
@@ -877,7 +825,7 @@ function TranslatorContent() {
                     </div>
                   </motion.div>
                 ) : (
-                  <div key="placeholder" className="flex-1 flex items-center justify-center text-gray-300 italic text-sm md:text-base">
+                  <div key="placeholder" className="flex-1 flex items-center justify-center text-gray-300 dark:text-[#2A2A2A] italic text-sm md:text-base font-sans transition-colors">
                     {isLoading ? "Translating..." : "Translation will appear here"}
                   </div>
                 )}
@@ -887,10 +835,17 @@ function TranslatorContent() {
                 <div className="absolute bottom-4 md:bottom-6 right-4 md:right-6 flex items-center gap-1.5 md:gap-2">
                   <button
                     onClick={() => handleGrammarCheck(result.translatedText, direction.split('-to-')[1] as 'benglish' | 'english')}
-                    className="p-1.5 md:p-2 rounded-lg hover:bg-blue-50 text-blue-500 transition-colors"
+                    className="p-1.5 md:p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500 dark:text-blue-400 transition-colors"
                     title="Check translation grammar"
                   >
                     <Wand2 className="w-4 h-4 md:w-5 md:h-5" />
+                  </button>
+                  <button
+                    onClick={handleShareResult}
+                    className="p-1.5 md:p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500 dark:text-blue-400 transition-colors"
+                    title="Share translation"
+                  >
+                    <Share2 className="w-4 h-4 md:w-5 md:h-5" />
                   </button>
                   <button
                     onClick={handleSpeak}
@@ -900,7 +855,7 @@ function TranslatorContent() {
                     <Volume2 className="w-4 h-4 md:w-5 md:h-5" />
                   </button>
                   <button
-                    onClick={copyToClipboard}
+                    onClick={() => copyToClipboard()}
                     className="p-1.5 md:p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors relative"
                     title="Copy to clipboard"
                   >
@@ -915,38 +870,26 @@ function TranslatorContent() {
 
         {/* Context Display */}
         {history.length > 0 && (
-          <div className="px-6 py-4 bg-gray-50/50 border border-gray-100 rounded-2xl mb-8">
+          <div className="px-6 py-4 bg-gray-50/50 dark:bg-black/10 border border-gray-100 dark:border-[#2E2E2E] rounded-2xl mb-8">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2">
                 <History className="w-3 h-3" />
                 Recent Context
               </h4>
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setHistory([])}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
                   title="Clear context for next translation"
                 >
                   Clear Context
-                </button>
-                <button 
-                  onClick={() => {
-                    if (confirm("This will clear your recent context and persistent translation history. Are you sure?")) {
-                      setHistory([]);
-                      offlineService.clearCache();
-                    }
-                  }}
-                  className="text-xs text-red-600 hover:text-red-700 font-medium"
-                  title="Clear context and offline cache"
-                >
-                  Clear All History
                 </button>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {history.map((item, idx) => (
-                <div key={idx} className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 max-w-[200px] truncate">
-                  <span className="font-semibold text-blue-600">Q:</span> {item.input}
+                <div key={idx} className="bg-white dark:bg-[#2E2E2E] px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#3E3E3E] text-xs text-gray-600 dark:text-gray-300 max-w-[200px] truncate">
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">Q:</span> {item.input}
                 </div>
               ))}
             </div>
@@ -955,142 +898,35 @@ function TranslatorContent() {
 
         {/* Features / Info Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-          <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-sm">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-100 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4">
-              <Sparkles className="text-orange-600 w-4 h-4 md:w-5 md:h-5" />
+          <div className="bg-white dark:bg-[#1E1E1E] p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 dark:border-[#2E2E2E] shadow-sm transition-colors">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-100 dark:bg-orange-900/20 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4">
+              <Sparkles className="text-orange-600 dark:text-orange-400 w-4 h-4 md:w-5 md:h-5" />
             </div>
-            <h3 className="text-sm md:text-base font-semibold mb-1 md:mb-2">Hybrid Engine</h3>
-            <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
+            <h3 className="text-sm md:text-base font-semibold mb-1 md:mb-2 dark:text-white">Hybrid Engine</h3>
+            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
               Combines rule-based mapping with advanced AI to handle slang, spelling variations, and context.
             </p>
           </div>
-          <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-sm">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-100 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4">
-              <History className="text-blue-600 w-4 h-4 md:w-5 md:h-5" />
+          <div className="bg-white dark:bg-[#1E1E1E] p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 dark:border-[#2E2E2E] shadow-sm transition-colors">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4">
+              <History className="text-blue-600 dark:text-blue-400 w-4 h-4 md:w-5 md:h-5" />
             </div>
-            <h3 className="text-sm md:text-base font-semibold mb-1 md:mb-2">Smart Learning</h3>
-            <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
+            <h3 className="text-sm md:text-base font-semibold mb-1 md:mb-2 dark:text-white">Smart Learning</h3>
+            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
               Our system logs unknown phrases to improve accuracy over time through community-driven data.
             </p>
           </div>
-          <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-sm">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-green-100 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4">
-              <Languages className="text-green-600 w-4 h-4 md:w-5 md:h-5" />
+          <div className="bg-white dark:bg-[#1E1E1E] p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 dark:border-[#2E2E2E] shadow-sm transition-colors">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-green-100 dark:bg-green-900/20 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4">
+              <Languages className="text-green-600 dark:text-green-400 w-4 h-4 md:w-5 md:h-5" />
             </div>
-            <h3 className="text-sm md:text-base font-semibold mb-1 md:mb-2">Bidirectional</h3>
-            <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
+            <h3 className="text-sm md:text-base font-semibold mb-1 md:mb-2 dark:text-white">Bidirectional</h3>
+            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
               Seamlessly switch between Benglish-to-English and English-to-Benglish for natural conversations.
-            </p>
-          </div>
-          <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-sm">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-amber-100 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4">
-              <WifiOff className="text-amber-600 w-4 h-4 md:w-5 md:h-5" />
-            </div>
-            <h3 className="text-sm md:text-base font-semibold mb-1 md:mb-2">Offline Mode</h3>
-            <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
-              Caches common translations and syncs a master dictionary for basic functionality without internet.
             </p>
           </div>
         </div>
       </main>
-
-      {/* Import Modal */}
-      <AnimatePresence>
-        {showImportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-blue-600" />
-                  Import Dataset
-                </h2>
-                <button 
-                  onClick={() => {
-                    setShowImportModal(false);
-                    setImportStatus(null);
-                  }}
-                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              
-              <div className="p-6">
-                <div className="mb-3 md:mb-4">
-                  <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1.5 md:mb-2">CSV Format</label>
-                  <div className="flex gap-2 md:gap-4">
-                    <button 
-                      onClick={() => setImportFormat('benglish-first')}
-                      className={cn(
-                        "flex-1 py-2 px-3 md:px-4 rounded-lg border text-[11px] md:text-sm transition-all",
-                        importFormat === 'benglish-first' ? "bg-blue-50 border-blue-200 text-blue-700 font-medium" : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                      )}
-                    >
-                      Benglish First
-                    </button>
-                    <button 
-                      onClick={() => setImportFormat('english-first')}
-                      className={cn(
-                        "flex-1 py-2 px-3 md:px-4 rounded-lg border text-[11px] md:text-sm transition-all",
-                        importFormat === 'english-first' ? "bg-blue-50 border-blue-200 text-blue-700 font-medium" : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                      )}
-                    >
-                      English First
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mb-3 md:mb-4">
-                  <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1.5 md:mb-2">Paste CSV Data</label>
-                  <textarea
-                    value={csvInput}
-                    onChange={(e) => setCsvInput(e.target.value)}
-                    placeholder="ID,Benglish,Bengali,English,Type,Tense,Synonyms,Sentence Example,Notes,Confidence..."
-                    className="w-full h-48 md:h-64 p-3 md:p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-[10px] md:text-xs resize-none"
-                  />
-                </div>
-
-                {importStatus && (
-                  <div className={cn(
-                    "mb-3 md:mb-4 p-3 md:p-4 rounded-xl flex items-start gap-2 md:gap-3",
-                    importStatus.success ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-700 border border-red-100"
-                  )}>
-                    {importStatus.success ? <Check className="w-4 h-4 md:w-5 md:h-5 shrink-0" /> : <AlertCircle className="w-4 h-4 md:w-5 md:h-5 shrink-0" />}
-                    <p className="text-[11px] md:text-sm">{importStatus.message}</p>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 md:gap-3">
-                  <button
-                    onClick={() => setShowImportModal(false)}
-                    className="px-4 md:px-6 py-1.5 md:py-2 text-xs md:text-sm text-gray-600 hover:bg-gray-100 rounded-full font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleImport}
-                    disabled={isImporting || !csvInput.trim()}
-                    className={cn(
-                      "px-6 md:px-8 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-2",
-                      csvInput.trim() && !isImporting
-                        ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
-                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    )}
-                  >
-                    {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Upload className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-                    {isImporting ? "Importing..." : "Start Import"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Suggest Correction Modal */}
       <AnimatePresence>
@@ -1100,60 +936,60 @@ function TranslatorContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden"
+              className="bg-white dark:bg-[#1E1E1E] rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-transparent dark:border-[#2E2E2E]"
             >
-              <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between bg-orange-50/50">
-                <h2 className="text-base md:text-lg font-semibold flex items-center gap-2 text-orange-800">
-                  <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-orange-600" />
+              <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 dark:border-[#2E2E2E] flex items-center justify-between bg-orange-50/50 dark:bg-orange-950/20">
+                <h2 className="text-base md:text-lg font-semibold flex items-center gap-2 text-orange-800 dark:text-orange-300">
+                  <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-orange-600 dark:text-orange-400" />
                   Suggest a Correction
                 </h2>
                 <button 
                   onClick={() => setShowCorrectionModal(false)}
-                  className="p-1.5 md:p-2 hover:bg-orange-100 rounded-full transition-colors"
+                  className="p-1.5 md:p-2 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-full transition-colors"
                 >
-                  <X className="w-4 h-4 md:w-5 md:h-5 text-orange-800" />
+                  <X className="w-4 h-4 md:w-5 md:h-5 text-orange-800 dark:text-orange-400" />
                 </button>
               </div>
               
               <div className="p-4 md:p-6">
                 <div className="mb-3 md:mb-4">
-                  <p className="text-[9px] md:text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Original Input</p>
-                  <div className="p-2.5 md:p-3 bg-gray-50 rounded-lg text-[11px] md:text-sm text-gray-600 border border-gray-100 italic">
+                  <p className="text-[9px] md:text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider mb-1">Original Input</p>
+                  <div className="p-2.5 md:p-3 bg-gray-50 dark:bg-[#121212] rounded-lg text-[11px] md:text-sm text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-[#2E2E2E] italic">
                     "{inputText}"
                   </div>
                 </div>
 
                 <div className="mb-3 md:mb-4">
-                  <p className="text-[9px] md:text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">AI Translation</p>
-                  <div className="p-2.5 md:p-3 bg-gray-50 rounded-lg text-[11px] md:text-sm text-gray-600 border border-gray-100 italic">
+                  <p className="text-[9px] md:text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider mb-1">AI Translation</p>
+                  <div className="p-2.5 md:p-3 bg-gray-50 dark:bg-[#121212] rounded-lg text-[11px] md:text-sm text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-[#2E2E2E] italic">
                     "{result?.translatedText}"
                   </div>
                 </div>
 
                 <div className="mb-4 md:mb-6">
-                  <label className="block text-[9px] md:text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1.5 md:mb-2">Your Suggested Translation</label>
+                  <label className="block text-[9px] md:text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider mb-1.5 md:mb-2">Your Suggested Translation</label>
                   <textarea
                     value={suggestedText}
                     onChange={(e) => setSuggestedText(e.target.value)}
                     placeholder={`How would you translate this to ${getTargetLang()}?`}
-                    className="w-full h-24 md:h-32 p-3 md:p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-[11px] md:text-sm resize-none"
+                    className="w-full h-24 md:h-32 p-3 md:p-4 bg-white dark:bg-[#121212] border border-gray-200 dark:border-[#2E2E2E] rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-[11px] md:text-sm text-gray-800 dark:text-white transition-all outline-none resize-none font-sans"
                   />
                 </div>
 
                 {correctionStatus && (
                   <div className={cn(
                     "mb-4 md:mb-6 p-3 md:p-4 rounded-xl flex items-start gap-2 md:gap-3",
-                    correctionStatus.success ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-700 border border-red-100"
+                    correctionStatus.success ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30"
                   )}>
                     {correctionStatus.success ? <Check className="w-4 h-4 md:w-5 md:h-5 shrink-0" /> : <AlertCircle className="w-4 h-4 md:w-5 md:h-5 shrink-0" />}
-                    <p className="text-[11px] md:text-sm">{correctionStatus.message}</p>
+                    <p className="text-[11px] md:text-sm font-sans">{correctionStatus.message}</p>
                   </div>
                 )}
 
                 <div className="flex justify-end gap-2 md:gap-3">
                   <button
                     onClick={() => setShowCorrectionModal(false)}
-                    className="px-4 md:px-6 py-1.5 md:py-2 text-xs md:text-sm text-gray-600 hover:bg-gray-100 rounded-full font-medium transition-colors"
+                    className="px-4 md:px-6 py-1.5 md:py-2 text-xs md:text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#2E2E2E] rounded-full font-medium transition-colors"
                   >
                     Cancel
                   </button>
@@ -1161,10 +997,10 @@ function TranslatorContent() {
                     onClick={handleSubmitCorrection}
                     disabled={isSubmittingCorrection || !suggestedText.trim()}
                     className={cn(
-                      "px-6 md:px-8 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-2",
+                      "px-6 md:px-8 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-2 shadow-sm font-sans",
                       suggestedText.trim() && !isSubmittingCorrection
-                        ? "bg-orange-600 text-white hover:bg-orange-700 shadow-md"
-                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        ? "bg-orange-600 text-white hover:bg-orange-700 hover:shadow-md"
+                        : "bg-gray-100 dark:bg-[#2E2E2E] text-gray-400 dark:text-gray-600 cursor-not-allowed"
                     )}
                   >
                     {isSubmittingCorrection ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4" />}
@@ -1178,17 +1014,24 @@ function TranslatorContent() {
       </AnimatePresence>
 
       {/* Footer */}
-      <footer className="mt-auto py-8 md:py-12 px-4 md:px-6 border-t border-gray-100 bg-white">
+      <footer className="mt-auto py-8 md:py-12 px-4 md:px-6 border-t border-gray-100 dark:border-[#2E2E2E] bg-white dark:bg-[#1E1E1E] transition-colors">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-center md:text-left">
-            <h2 className="text-lg font-bold text-gray-900 mb-1">Benglishify.in</h2>
-            <p className="text-gray-400 text-xs md:text-sm">© 2026 Benglishify.in for the Bengali community.</p>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Benglishify.in</h2>
+            <p className="text-gray-400 dark:text-gray-500 text-xs md:text-sm">© 2026 Benglishify.in for the Bengali community.</p>
           </div>
           
           <div className="flex items-center gap-6">
             <Link 
+              to="/install" 
+              className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <Smartphone className="w-5 h-5" />
+              <span>Install App</span>
+            </Link>
+            <Link 
               to="/about" 
-              className="text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-2 text-sm font-medium"
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-medium"
             >
               <Info className="w-5 h-5" />
               <span>About</span>
@@ -1197,7 +1040,7 @@ function TranslatorContent() {
               href="https://github.com/rickhub0" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-2 text-sm font-medium"
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-medium"
             >
               <Github className="w-5 h-5" />
               <span>GitHub</span>
@@ -1206,7 +1049,7 @@ function TranslatorContent() {
               href="https://www.instagram.com/clickors/" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-gray-400 hover:text-pink-600 transition-colors flex items-center gap-2 text-sm font-medium"
+              className="text-gray-400 dark:text-gray-500 hover:text-pink-600 dark:hover:text-pink-400 transition-colors flex items-center gap-2 text-sm font-medium"
             >
               <Instagram className="w-5 h-5" />
               <span>Instagram</span>
@@ -1222,57 +1065,57 @@ function TranslatorContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              className="bg-white dark:bg-[#1E1E1E] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-transparent dark:border-[#2E2E2E]"
             >
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-50/50">
+              <div className="p-6 border-b border-gray-100 dark:border-[#2E2E2E] flex items-center justify-between bg-blue-50/50 dark:bg-blue-950/20">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Wand2 className="w-5 h-5 text-blue-600" />
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Wand2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <h3 className="font-bold text-gray-900">Grammar Check</h3>
+                  <h3 className="font-bold text-gray-900 dark:text-white">Grammar Check</h3>
                 </div>
                 <button 
                   onClick={() => setShowGrammarModal(false)}
-                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-[#2E2E2E] rounded-full transition-colors"
                 >
-                  <X className="w-5 h-5 text-gray-400" />
+                  <X className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 </button>
               </div>
 
               <div className="p-6 space-y-6">
                 {grammarResult.isCorrect ? (
                   <div className="flex flex-col items-center text-center space-y-3 py-4">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-10 h-10 text-green-600" />
+                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-green-700 text-lg">Perfect!</h4>
-                      <p className="text-gray-500 text-sm">Your grammar is already correct.</p>
+                      <h4 className="font-bold text-green-700 dark:text-green-400 text-lg">Perfect!</h4>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm">Your grammar is already correct.</p>
                     </div>
                   </div>
                 ) : (
                   <>
                     <div className="space-y-4">
                       <div>
-                        <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-1.5 block">Original</label>
-                        <p className="text-gray-600 bg-gray-50 p-3 rounded-xl text-sm italic border border-gray-100">
+                        <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500 mb-1.5 block">Original</label>
+                        <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-[#121212] p-3 rounded-xl text-sm italic border border-gray-100 dark:border-[#2E2E2E]">
                           {grammarResult.originalText}
                         </p>
                       </div>
                       <div>
-                        <label className="text-[10px] uppercase tracking-wider font-bold text-blue-400 mb-1.5 block">Suggested Correction</label>
-                        <p className="text-gray-900 bg-blue-50 p-3 rounded-xl text-sm font-medium border border-blue-100">
+                        <label className="text-[10px] uppercase tracking-wider font-bold text-blue-400 dark:text-blue-500 mb-1.5 block">Suggested Correction</label>
+                        <p className="text-gray-900 dark:text-white bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl text-sm font-medium border border-blue-100 dark:border-blue-900/30">
                           {grammarResult.correctedText}
                         </p>
                       </div>
                     </div>
 
                     {grammarResult.explanation && (
-                      <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex gap-3">
-                        <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl border border-amber-100 dark:border-amber-900/30 flex gap-3">
+                        <Info className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
                         <div className="space-y-1">
-                          <p className="text-xs font-bold text-amber-700 uppercase tracking-tight">Why this change?</p>
-                          <p className="text-sm text-amber-800 leading-relaxed">
+                          <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-tight">Why this change?</p>
+                          <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
                             {grammarResult.explanation}
                           </p>
                         </div>
@@ -1282,10 +1125,10 @@ function TranslatorContent() {
                 )}
               </div>
 
-              <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+              <div className="p-4 bg-gray-50 dark:bg-black/10 border-t border-gray-100 dark:border-[#2E2E2E] flex gap-3">
                 <button
                   onClick={() => setShowGrammarModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#2E2E2E] transition-colors"
                 >
                   Close
                 </button>
@@ -1294,16 +1137,15 @@ function TranslatorContent() {
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(grammarResult.correctedText);
-                        // Maybe show a toast or change icon briefly
                       }}
-                      className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border border-blue-200 dark:border-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-center gap-2"
                     >
                       <Copy className="w-4 h-4" />
                       Copy
                     </button>
                     <button
                       onClick={applyGrammarCorrection}
-                      className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all active:scale-95"
+                      className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 shadow-md transition-all active:scale-95"
                     >
                       Apply
                     </button>
@@ -1320,11 +1162,14 @@ function TranslatorContent() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<TranslatorContent />} />
-        <Route path="/about" element={<AboutPage />} />
-      </Routes>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<TranslatorContent />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/install" element={<InstallGuide />} />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

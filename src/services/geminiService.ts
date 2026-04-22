@@ -73,19 +73,19 @@ export async function translateWithAI(text: string, direction: TranslationDirect
 
     switch (direction) {
       case 'benglish-to-english':
-        systemInstruction = "You are a Benglish-to-English translator. Benglish is Bengali written in English letters. Translate the input to natural English. Example: 'ami kal meeting e jabo' -> 'I will go to the meeting tomorrow'." + contextPrompt;
+        systemInstruction = "Translate Benglish (Bengali in English letters) to natural English. Precise, contextual, and handle slang. " + contextPrompt;
         break;
       case 'english-to-benglish':
-        systemInstruction = "You are an English-to-Benglish translator. Translate the input to natural Benglish (Bengali written in English letters). Example: 'I will go to the meeting tomorrow' -> 'ami kal meeting e jabo'." + contextPrompt;
+        systemInstruction = "Translate English to natural Benglish (Bengali in English letters). Use common phonetic spellings used in social media. " + contextPrompt;
         break;
       case 'bengali-to-english':
-        systemInstruction = "You are a Bengali-to-English translator. Translate the Bengali script input to natural English. Example: 'আমি কাল মিটিংয়ে যাব' -> 'I will go to the meeting tomorrow'." + contextPrompt;
+        systemInstruction = "Translate Bengali script to natural English. Concise and accurate. " + contextPrompt;
         break;
       case 'english-to-bengali':
-        systemInstruction = "You are an English-to-Bengali translator. Translate the English input to natural Bengali script. Example: 'I will go to the meeting tomorrow' -> 'আমি কাল মিটিংয়ে যাব'." + contextPrompt;
+        systemInstruction = "Translate English to natural Bengali script. Correct grammar and tone. " + contextPrompt;
         break;
       default:
-        systemInstruction = "You are a translator between English and Benglish (Bengali in English letters)." + contextPrompt;
+        systemInstruction = "Translate between English, Bengali, and Benglish." + contextPrompt;
     }
 
     const response = await ai.models.generateContent({

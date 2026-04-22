@@ -1,12 +1,11 @@
 import { db, auth } from "../firebase";
 import { collection, query, where, getDocs, addDoc, serverTimestamp, increment, updateDoc, doc, DocumentData, limit } from "firebase/firestore";
 import { translateWithAI, TranslationDirection, ConversationContext } from "./geminiService";
-import { offlineService } from "./offlineService";
 
 export interface TranslationResult {
   translatedText: string;
   confidence: number;
-  source: 'rule-based' | 'ai' | 'offline-cache' | 'offline-dictionary';
+  source: 'rule-based' | 'ai';
   fullResult?: {
     benglish: string;
     english: string;
@@ -66,48 +65,27 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 export async function syncMasterDictionary() {
-  if (!offlineService.isOnline()) return;
-  
   try {
     const translationsRef = collection(db, "translations");
-    const q = query(translationsRef, limit(500)); // Sync top 500 common translations
-    const querySnapshot = await getDocs(q);
-    const data = querySnapshot.docs.map(doc => doc.data());
-    offlineService.saveMasterDictionary(data);
-    console.log("Master dictionary synced offline.");
+    const q = query(translationsRef, limit(500)); // Sync 
+    await getDocs(q);
   } catch (error) {
     console.warn("Failed to sync master dictionary:", error);
   }
 }
 
+const translationCache = new Map<string, TranslationResult>();
+const MAX_CACHE_SIZE = 100;
+
 export async function translate(text: string, direction: TranslationDirection, history: ConversationContext[] = []): Promise<TranslationResult> {
-  const isOnline = offlineService.isOnline();
-
-  // 1. Check Offline Cache/Dictionary first if offline
-  if (!isOnline) {
-    const cached = offlineService.getFromCache(text, direction);
-    if (cached) {
-      return {
-        translatedText: cached.translatedText,
-        confidence: cached.confidence,
-        source: 'offline-cache',
-        fullResult: cached.fullResult
-      };
-    }
-
-    const dictMatch = offlineService.lookupInDictionary(text, direction);
-    if (dictMatch) {
-      return {
-        translatedText: dictMatch,
-        confidence: 0.95,
-        source: 'offline-dictionary'
-      };
-    }
-
-    throw new Error("You are currently offline. This translation is not available in your local cache.");
+  const cacheKey = `${direction}:${text.trim().toLowerCase()}`;
+  
+  // Check in-memory cache first for near-instant results
+  if (translationCache.has(cacheKey)) {
+    return translationCache.get(cacheKey)!;
   }
 
-  // 2. Rule-based lookup (Online)
+  // 1. Rule-based lookup (Online)
   const path = "translations";
   try {
     const translationsRef = collection(db, path);
@@ -142,7 +120,14 @@ export async function translate(text: string, direction: TranslationDirection, h
             confidence: docData.confidence || 1.0,
             source: 'rule-based'
           };
-          offlineService.saveToCache(text, direction, result);
+          
+          // Cache successful result
+          if (translationCache.size >= MAX_CACHE_SIZE) {
+            const firstKey = translationCache.keys().next().value;
+            if (firstKey) translationCache.delete(firstKey);
+          }
+          translationCache.set(cacheKey, result);
+
           return result;
         }
       }
@@ -151,7 +136,7 @@ export async function translate(text: string, direction: TranslationDirection, h
     console.warn("Rule-based lookup failed, falling back to AI:", error);
   }
 
-  // 3. AI Translation (Online)
+  // 2. AI Translation (Online)
   try {
     const aiTranslation = await translateWithAI(text, direction, history);
     
@@ -171,10 +156,16 @@ export async function translate(text: string, direction: TranslationDirection, h
       };
     }
 
-    // Cache successful AI translations too
+    // Save successful AI translations to unknown inputs log
     if (result.translatedText && result.translatedText !== "Error in translation.") {
-      offlineService.saveToCache(text, direction, result);
       logUnknownInput(text, direction);
+      
+      // Cache successful result
+      if (translationCache.size >= MAX_CACHE_SIZE) {
+        const firstKey = translationCache.keys().next().value;
+        if (firstKey) translationCache.delete(firstKey);
+      }
+      translationCache.set(cacheKey, result);
     }
 
     return result;

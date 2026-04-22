@@ -201,23 +201,6 @@ footer {
   border-top: 1px solid var(--border);
 }
 
-.status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
-.dot.online { background-color: #4caf50; }
-.dot.offline { background-color: #f44336; }
-
 #mic-btn {
   background: var(--accent);
   color: white;
