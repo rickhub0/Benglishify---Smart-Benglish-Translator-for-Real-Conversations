@@ -3,7 +3,6 @@ import { Sun, Moon, LogIn, LogOut, Loader2, ArrowLeft, History } from "lucide-re
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { cn } from "../lib/utils";
-// @ts-ignore
 const logo = "https://benglishify.in/logo.png";
 
 export default function Header() {

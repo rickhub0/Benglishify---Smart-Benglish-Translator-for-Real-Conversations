@@ -2,7 +2,6 @@ import { Smartphone, Chrome, Compass, Share, MoreVertical, PlusSquare, ArrowLeft
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
-// @ts-ignore
 const logo = "https://benglishify.in/logo.png";
 
 export default function InstallGuide() {
