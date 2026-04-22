@@ -20,19 +20,7 @@ export default function InstallGuide() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#202124] font-sans flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </Link>
-          <img src={logo} alt="Logo" className="w-8 h-8 object-contain" />
-          <h1 className="text-lg font-bold tracking-tight">Install Guide</h1>
-        </div>
-      </header>
-
-      <main className="max-w-3xl mx-auto p-4 md:p-8 flex-1 w-full">
+    <main className="max-w-3xl mx-auto p-4 md:p-8 flex-1 w-full">
         <motion.div 
           initial="hidden"
           animate="visible"
@@ -212,19 +200,5 @@ export default function InstallGuide() {
         </motion.div>
       </main>
 
-      {/* Footer */}
-      <footer className="py-12 px-4 md:px-6 border-t border-gray-100 bg-white">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="text-center md:text-left">
-            <h2 className="text-lg font-bold text-gray-900 mb-1">Benglishify.in</h2>
-            <p className="text-gray-400 text-xs md:text-sm">© 2026 Benglishify.in for the Bengali community.</p>
-          </div>
-          <Link to="/about" className="text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2 text-sm font-medium">
-            <Info className="w-5 h-5" />
-            <span>About US</span>
-          </Link>
-        </div>
-      </footer>
-    </div>
   );
 }

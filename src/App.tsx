@@ -3,10 +3,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// @ts-ignore
-import logo from "/public/logo.png";
-import { useState, useEffect } from "react";
-import { Languages, ArrowRightLeft, Copy, Check, Sparkles, History, Info, Loader2, Settings, X, AlertCircle, LogIn, LogOut, User, ChevronDown, Mic, MicOff, Volume2, CheckCircle, XCircle, Wand2, Github, Instagram, Share2, Smartphone, Moon, Sun } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { 
+  Languages, 
+  ArrowRightLeft, 
+  Copy, 
+  Check, 
+  Sparkles, 
+  History, 
+  Info, 
+  Loader2, 
+  Settings, 
+  X, 
+  AlertCircle, 
+  Mic, 
+  MicOff, 
+  Volume2, 
+  CheckCircle, 
+  XCircle, 
+  Wand2, 
+  Github, 
+  Instagram, 
+  Share2, 
+  Smartphone,
+  ChevronDown,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { translate, TranslationResult, syncMasterDictionary } from "./services/translationService";
 import { submitCorrection } from "./services/correctionService";
@@ -15,14 +37,14 @@ import { transliterationService } from "./services/transliterationService";
 import { checkGrammar, GrammarCheckResult } from "./services/grammarlyService";
 import { TranslationDirection, ConversationContext } from "./services/geminiService";
 import { cn } from "./lib/utils";
-import { auth } from "./firebase";
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import Layout from "./components/Layout";
 import AboutPage from "./pages/About";
 import InstallGuide from "./pages/InstallGuide";
-import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 function TranslatorContent() {
+  const { user } = useAuth();
   const [inputText, setInputText] = useState("");
   const [direction, setDirection] = useState<TranslationDirection>('benglish-to-english');
   const [result, setResult] = useState<TranslationResult | null>(null);
@@ -30,13 +52,6 @@ function TranslatorContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   
-  // Theme State
-  const { isDarkMode, toggleDarkMode } = useTheme();
-
-  // Auth State
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-
   // Correction State
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
   const [suggestedText, setSuggestedText] = useState("");
@@ -78,46 +93,11 @@ function TranslatorContent() {
     return () => clearTimeout(timer);
   }, [inputText, direction, isVoiceMode]);
 
-  // Live translation for immediate feedback
-  const handleLiveTranslate = (text: string) => {
-    if (!text.trim() || isVoiceMode) return;
-    // Word-by-word or dictionary logic removed to simplify for real-time cloud AI only
-  };
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthLoading(false);
-      if (currentUser) {
-        syncMasterDictionary();
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      // Ignore if user closed the popup
-      if (error.code === 'auth/popup-closed-by-user') {
-        return;
-      }
-      console.error("Login error:", error);
+    if (user) {
+      syncMasterDictionary();
     }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
+  }, [user]);
 
   const handleTranslate = async (overrideDirection?: TranslationDirection, overrideText?: string) => {
     const textToTranslate = overrideText || inputText;
@@ -352,60 +332,10 @@ function TranslatorContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#121212] text-[#202124] dark:text-gray-100 font-sans selection:bg-blue-100 transition-colors duration-300 flex flex-col">
-      {/* Header */}
-      <header className="bg-white dark:bg-[#1E1E1E] border-b border-gray-200 dark:border-[#2E2E2E] px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10 transition-colors">
-        <div className="flex items-center gap-2 md:gap-3">
-          <img src={logo} alt="Benglishify Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain" referrerPolicy="no-referrer" />
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center">
-            <span className="text-gray-900 dark:text-white">বেং</span>
-            <span className="text-[#C25400] dark:text-[#FF8C00]">lish</span>
-            <span className="text-gray-900 dark:text-white">ify</span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-1 md:gap-2">
-          <button 
-            onClick={toggleDarkMode}
-            className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-full hover:bg-blue-50 dark:hover:bg-[#2E2E2E] transition-colors"
-            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-
-          <div className="hidden md:block h-6 w-[1px] bg-gray-200 dark:bg-[#2E2E2E] mx-1" />
-
-          {isAuthLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-          ) : user ? (
-            <div className="flex items-center gap-1 md:gap-2">
-              <img src={user.photoURL || ""} alt={user.displayName || ""} className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-gray-200" referrerPolicy="no-referrer" />
-              <button 
-                onClick={handleLogout}
-                className="text-gray-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-          ) : (
-            <button 
-              onClick={handleLogin}
-              className="flex items-center gap-2 px-3 md:px-4 py-1.5 rounded-full border border-gray-200 text-xs md:text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all"
-            >
-              <LogIn className="w-4 h-4" />
-              <span className="hidden xs:inline">Sign In</span>
-            </button>
-          )}
-
-          <button className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition-colors">
-            <History className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto p-4 md:p-8 flex-1 w-full flex flex-col gap-6">
+    <div className="flex-1 flex flex-col p-4 md:p-6 mb-12">
+      <main className="max-w-5xl mx-auto w-full flex-1 flex flex-col gap-8 md:gap-12">
         {/* Mode Toggle */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6 md:gap-8">
           {translationError && (
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
@@ -472,7 +402,7 @@ function TranslatorContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 min-h-[400px]">
               
               {/* Left Side: Input (Benglish + Bengali) */}
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-6">
                 <div className="bg-white dark:bg-[#1E1E1E] rounded-3xl shadow-sm border border-gray-100 dark:border-[#2E2E2E] p-6 md:p-10 flex-1 flex flex-col gap-6 relative overflow-hidden transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -581,7 +511,7 @@ function TranslatorContent() {
               </div>
 
               {/* Right Side: Output (English) */}
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-6">
                 <div className={cn(
                   "bg-white dark:bg-[#1E1E1E] rounded-3xl shadow-xl border border-gray-100 dark:border-[#2E2E2E] p-6 md:p-10 flex-1 flex flex-col gap-6 relative transition-all",
                   isLoading && "opacity-60 grayscale-[0.5]"
@@ -638,7 +568,7 @@ function TranslatorContent() {
                     setLiveBenglish("");
                     setLiveBengali("");
                   }}
-                  className="mt-4 flex items-center justify-center gap-2 py-4 rounded-3xl text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#1A1A1A] transition-all text-[10px] font-black uppercase tracking-widest"
+                  className="flex items-center justify-center gap-2 py-4 rounded-3xl text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#1A1A1A] transition-all text-[10px] font-black uppercase tracking-widest"
                 >
                   <X className="w-4 h-4" />
                   Reset Session
@@ -648,7 +578,7 @@ function TranslatorContent() {
           </div>
         ) : (
           /* Existing Text Translation UI */
-          <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6 md:mb-8">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="flex items-center border-b border-gray-100 bg-gray-50/50">
             {/* Source Language Selector */}
             <div className="flex-1 relative group">
@@ -730,7 +660,6 @@ function TranslatorContent() {
                 onChange={(e) => {
                   const text = e.target.value;
                   setInputText(text);
-                  handleLiveTranslate(text);
                 }}
                 placeholder={isListening ? "Speak now..." : `Enter ${getSourceLang()}...`}
                 className={cn(
@@ -870,7 +799,7 @@ function TranslatorContent() {
 
         {/* Context Display */}
         {history.length > 0 && (
-          <div className="px-6 py-4 bg-gray-50/50 dark:bg-black/10 border border-gray-100 dark:border-[#2E2E2E] rounded-2xl mb-8">
+          <div className="px-6 py-4 bg-gray-50/50 dark:bg-black/10 border border-gray-100 dark:border-[#2E2E2E] rounded-2xl">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2">
                 <History className="w-3 h-3" />
@@ -897,7 +826,7 @@ function TranslatorContent() {
         )}
 
         {/* Features / Info Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
           <div className="bg-white dark:bg-[#1E1E1E] p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 dark:border-[#2E2E2E] shadow-sm transition-colors">
             <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-100 dark:bg-orange-900/20 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4">
               <Sparkles className="text-orange-600 dark:text-orange-400 w-4 h-4 md:w-5 md:h-5" />
@@ -1013,50 +942,6 @@ function TranslatorContent() {
         )}
       </AnimatePresence>
 
-      {/* Footer */}
-      <footer className="mt-auto py-8 md:py-12 px-4 md:px-6 border-t border-gray-100 dark:border-[#2E2E2E] bg-white dark:bg-[#1E1E1E] transition-colors">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="text-center md:text-left">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Benglishify.in</h2>
-            <p className="text-gray-400 dark:text-gray-500 text-xs md:text-sm">© 2026 Benglishify.in for the Bengali community.</p>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <Link 
-              to="/install" 
-              className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <Smartphone className="w-5 h-5" />
-              <span>Install App</span>
-            </Link>
-            <Link 
-              to="/about" 
-              className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <Info className="w-5 h-5" />
-              <span>About</span>
-            </Link>
-            <a 
-              href="https://github.com/rickhub0" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <Github className="w-5 h-5" />
-              <span>GitHub</span>
-            </a>
-            <a 
-              href="https://www.instagram.com/clickors/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-gray-400 dark:text-gray-500 hover:text-pink-600 dark:hover:text-pink-400 transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <Instagram className="w-5 h-5" />
-              <span>Instagram</span>
-            </a>
-          </div>
-        </div>
-      </footer>
       {/* Grammarly Modal */}
       <AnimatePresence>
         {showGrammarModal && grammarResult && (
@@ -1163,13 +1048,17 @@ function TranslatorContent() {
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<TranslatorContent />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/install" element={<InstallGuide />} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<TranslatorContent />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/install" element={<InstallGuide />} />
+            </Routes>
+          </Layout>
+        </BrowserRouter>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

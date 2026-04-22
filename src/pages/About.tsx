@@ -6,38 +6,8 @@ import { Link } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 
 export default function AboutPage() {
-  const { isDarkMode, toggleDarkMode } = useTheme();
-
   return (
-    <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#121212] text-[#202124] dark:text-gray-100 font-sans flex flex-col transition-colors duration-300">
-      {/* Header */}
-      <header className="bg-white dark:bg-[#1E1E1E] border-b border-gray-200 dark:border-[#2E2E2E] px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10 transition-colors">
-        <Link to="/" className="flex items-center gap-2 md:gap-3">
-          <img src={logo} alt="Benglishify Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain" referrerPolicy="no-referrer" />
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center">
-            <span className="text-gray-900 dark:text-white">বেং</span>
-            <span className="text-[#C25400] dark:text-[#FF8C00]">lish</span>
-            <span className="text-gray-900 dark:text-white">ify</span>
-          </h1>
-        </Link>
-        
-        <div className="flex items-center gap-4 md:gap-6">
-          <button 
-            onClick={toggleDarkMode}
-            className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-full hover:bg-blue-50 dark:hover:bg-[#2E2E2E] transition-colors"
-            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-
-          <Link to="/" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2">
-            <Languages className="w-4 h-4" />
-            <span className="hidden xs:inline">Back to Translator</span>
-          </Link>
-        </div>
-      </header>
-
-      <main className="flex-1">
+    <main className="flex-1">
         {/* Product Overview & Core Details */}
         <section className="bg-[#fcfcfc] dark:bg-[#161616] py-20 px-4 transition-colors">
           <div className="max-w-4xl mx-auto">
@@ -214,35 +184,5 @@ export default function AboutPage() {
         </section>
       </main>
 
-      <footer className="py-8 md:py-12 px-4 md:px-6 border-t border-gray-100 dark:border-[#2E2E2E] bg-white dark:bg-[#1E1E1E] transition-colors">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="text-center md:text-left">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Benglishify.in</h2>
-            <p className="text-gray-400 dark:text-gray-500 text-xs md:text-sm">© 2026 Benglishify.in for the Bengali community.</p>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <a 
-              href="https://github.com/rickhub0" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <Github className="w-5 h-5" />
-              <span>GitHub</span>
-            </a>
-            <a 
-              href="https://www.instagram.com/clickors/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-gray-400 dark:text-gray-500 hover:text-pink-600 dark:hover:text-pink-500 transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <Instagram className="w-5 h-5" />
-              <span>Instagram</span>
-            </a>
-          </div>
-        </div>
-      </footer>
-    </div>
   );
 }
